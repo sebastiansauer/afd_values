@@ -34,11 +34,10 @@ knitr::opts_chunk$set(
 
 
 ```{r}
-library(tidyverse)
-library(rethinking)
 library(sjmisc)
 library(viridis)
 library(pradadata)  # elec data
+library(tidyverse)
 ```
 
 
@@ -53,7 +52,7 @@ Load zip data (PLZ):
 
 
 ```{r load-zip-data}
-zip <- readxl::read_excel("../data_raw/Wahlkreise_PLZ.xlsx")
+zip <- readxl::read_excel("data_raw/Wahlkreise_PLZ.xlsx")
 ```
 
 
@@ -75,7 +74,7 @@ Load values data:
 
 
 ```{r load-values-data}
-load("../data_raw/Choughs2017.Rdata")
+load("data_raw/Choughs2017.Rdata")
 values <- Choughs2017
 ```
 
@@ -286,6 +285,35 @@ Note that a left join was performed.
 
 d_joined <- d_zip %>% 
   left_join(values, by = c("PLZ" = "PLZ"))
+```
+
+
+
+# Check
+
+Number of rows in the final dataset should approximate the row count in the values data set.
+
+```{r}
+nrow(values)/nrow(d_joined)
+```
+
+
+## Number of missings per column
+
+
+```{r}
+d_joined %>% 
+  map(~ sum(is.na(.)))
+```
+
+
+## Number of missings per row
+
+```{r}
+d_joined %>% 
+  mutate(NA_row = rowSums(is.na(.))) %>% 
+  ggplot(aes(x = NA_row)) +
+  geom_histogram()
 ```
 
 
