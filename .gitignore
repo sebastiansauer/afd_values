@@ -1,0 +1,23 @@
+
+# not project relevant
+input/
+
+
+# caches
+**/*_cache
+
+
+# binaries
+
+
+# project files
+.Rproj.user/
+.Rhistory
+
+
+
+# other strange stuff
+.DS_Store
+
+
+

@@ -1,0 +1,291 @@
+---
+title: "Join zip data to values data"
+date: "19 11 2018"
+output: html_document
+params:
+  date: !r Sys.Date()
+  verbose: TRUE
+editor_options: 
+  chunk_output_type: console
+---
+
+
+
+```{r knitr-setup}
+knitr::opts_chunk$set(
+  comment = "#>",
+  collapse = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  cache = TRUE,
+  out.width = "70%",
+  fig.align = 'center',
+  fig.width = 6,
+  fig.asp =  0.4,  #0.618,  # 1 / phi
+  fig.show = "hold",
+  size = "tiny"
+)
+
+```
+
+
+
+# Load packages
+
+
+```{r}
+library(tidyverse)
+library(rethinking)
+library(sjmisc)
+library(viridis)
+library(pradadata)  # elec data
+```
+
+
+
+
+# Load data
+
+
+
+## Zip data
+Load zip data (PLZ):
+
+
+```{r load-zip-data}
+zip <- readxl::read_excel("../data_raw/Wahlkreise_PLZ.xlsx")
+```
+
+
+This dataset was accessed form [DeStatis](https://www.destatis.de/DE/ZahlenFakten/LaenderRegionen/Regionales/Gemeindeverzeichnis/Administrativ/Archiv/GVAuszugQ/BTW20174Q2016.html)
+
+
+Copyright Notice:
+
+ Daten (im Auftrag der Herausgebergemeinschaft Statistische Ämter des Bundes und der Länder)
+      Statistisches Bundesamt, Wiesbaden 2017
+           Vervielfältigung und Verbreitung, auch auszugsweise, mit Quellenangabe gestattet.
+           
+          
+          
+          
+## Values data
+
+Load values data:
+
+
+```{r load-values-data}
+load("../data_raw/Choughs2017.Rdata")
+values <- Choughs2017
+```
+
+
+
+## Election data
+
+These data are provided by the Bundeswahlleiter 2017.
+
+
+```{r data-elec}
+data("elec_results")
+```
+
+
+In order to combine socioeconomic data with the election results, we can make use of data from the same source as above. Again accessible via the same R pacakge:
+
+```{r data-socec}
+data("socec")
+```
+
+Note that a code book is available for these data:
+
+```{r data-socec-dict}
+data("socec_dict")
+
+```
+
+
+
+These data will be used as predictors for modeling the election results.
+
+Third, we will make use of geo data in order to geoplot the modeling results. The Bundeswahlleiter provides such data (again via `pradadata`):
+
+```{r data-shp}
+data("wahlkreise_shp")
+
+```
+
+
+
+Note: Data objects can also be downloaded [from this source](https://osf.io/2yhr9/).
+
+
+
+# Data preparation
+
+
+Now let's merge the data frames. There will also be some janitor work such as renaming columns etc.
+
+
+First, change the names of the `socec` data to a common format:
+
+```{r soceec-rename}
+socec_renamed <- socec %>%
+  rename(state = V01,
+         area_nr = V02,
+         area_name = V03,
+         total_n = V06,
+         germans_n = V07,
+         for_prop = V08,
+         pop_move_prop = V11,
+         pop_migr_background_prop = V19,
+         income = V26,
+         unemp_prop = V47) 
+
+```
+
+
+Compute some more columns:
+
+```{r socec-new-cols}
+socec2 <- socec_renamed %>% 
+   mutate(foreigner_n = total_n - germans_n,
+         pop_move_n = pop_move_prop * total_n,
+         unemp_n = unemp_prop * total_n / 100,
+         pop_migr_background_n = pop_migr_background_prop * total_n / 100) %>% 
+  drop_na()
+```
+
+
+
+Same thing with the election data, here we only need the criterion (AfD success) and the ID variables for merging:
+
+```{r elec-results-new-cols}
+elec_results2 <- elec_results %>%
+  rename(afd_votes = AfD_3,
+         area_nr = district_nr,
+         area_name = district_name,
+         votes_total = votes_valid_3) %>% 
+   mutate(afd_prop = afd_votes/votes_total)    # valid votes only, and of the present Zweitstimme
+```
+
+Note that we are focusing on the Zweitstimme of the present election (hence the `3` in `votes_valid_3` and in `AfD_3`).
+
+# Merge
+
+
+```{r merge}
+socec2 %>%
+  left_join(elec_results2, by = "area_name") %>% 
+  left_join(wahlkreise_shp, by = c("area_name" = "WKR_NAME")) -> d_all_with_na
+```
+
+
+# After-merge preparations
+
+<!-- Now let's remove missings: -->
+
+<!-- ```{r drop-na} -->
+<!-- d_all <- drop_na(d_all_with_na) -->
+<!-- ``` -->
+
+Add variable for East (1) vs. West (0):
+
+
+```{r east-west-dummy}
+d_all_with_na <- d_all_with_na %>% 
+  mutate(east = case_when(
+    state %in% c("Mecklenburg-Vorpommern", "Brandenburg", "Berlin", "Sachsen-Anhalt", "Sachsen", "Thüringen") ~ "yes",
+    TRUE ~ "no"
+    ) 
+  )
+
+d_all_with_na$east_num <- ifelse(d_all_with_na$east == "yes", 1, 0)
+```
+
+
+
+# Main data frame: d_short and d_short_X
+
+We will also provide a version without the geo data, and in pure (old school) `data frame` form (ie., not as tibble)_
+
+```{r d-short-with-nas}
+d_all_with_na %>%
+  rename(area_nr = area_nr.x) %>% 
+  select(state,
+         area_nr,
+         area_name,
+         total_n,
+         germans_n,
+         foreigner_n,
+         for_prop,
+         pop_move_n,
+         pop_migr_background_n,
+         income ,
+         unemp_n,
+         unemp_prop,
+         votes_total,
+         afd_votes,
+         afd_prop,
+         state,
+         east,
+         east_num) -> d_short_with_nas
+
+if (params$verbose == TRUE) names(d_short_with_nas)
+```
+
+
+Remove NAs:
+
+```{r nona}
+d_short_with_nas %>% 
+  drop_na() -> d_short_nona
+```
+
+
+Add state id:
+
+```{r staste-id}
+d_short_nona$state_id <- coerce_index(d_short_nona$state)
+```
+
+
+
+
+
+Multiply by 1000 to get the real numbers so that a count model gets the "right" data
+
+```{r mult-by-1000}
+d_short_nona %>%
+  mutate_at(vars(total_n, germans_n, foreigner_n, pop_move_n,
+                    pop_migr_background_n, unemp_n), funs(. * 1000)
+  ) -> d_short_nona_1000
+
+if (params$verbose == TRUE) glimpse(d_short_nona_1000)
+
+```
+
+
+
+
+# Join election data with zip data
+
+
+
+```{r join-elec-with-zip}
+d_zip <- d_short_nona %>% 
+  left_join(zip, by = c("area_name" = "Wahlkreis_Name"))
+```
+
+
+Note that a left join was performed.
+
+# Join election data with values data
+
+```{r join-elec-with-values}
+
+d_joined <- d_zip %>% 
+  left_join(values, by = c("PLZ" = "PLZ"))
+```
+
+
