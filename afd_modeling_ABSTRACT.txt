@@ -1,0 +1,17 @@
+What drives AfD election success?
+
+
+
+- AfD hat in kurzer Zeit enorm hohe Prozente gewonnen
+- Es stellt sich daher die Frage, wie kompass
+- In diesem Beitrag sollen Folk theories dazu überprüft werden
+- Es geht nicht um Optimierung der Vorhersgaegüte (Minimierung des Vorhersagefehlers), sondern um ein besseres Verständnis der Prozesse
+- Dazu wird ein Multilevel-Bayes-LM verwendet
+- Datenbasis: Strukturdaten, Wahldtaen BTW 2017 und Wertedaten (Gansser)
+- Zwar haben bisherige Studien den Wahlerfolg der AfD untersucht, aber keine mit dieser Methodik (Multi Level Bayes) und keine mit Werte-Daten auf Personen-Ebene und in der Größe. DAs ist die Stärke dieser Studie
+- Die Ergebnisse zeigen, dass die Ursache von Wahldaten bisher noch wenig verstanden sind
+- Erhellend ist dies insofern, als dass gängige Folk Theories entkräftet werden konnten
+- Observational research scheint hier nicht weiter zu kommen. Qualitative Studien könnten helfen oder komplett andere Proxis.
+- Letzteres sollte aber auf einer starken Theorie beruhen, um die Gefahr von Falsch-Poswitiven Ergebnissen zu minimieren.
+- Das wirft uns wieder mal auf das Problem zurück, dass Fortschritt in der Wissenschaft an mangelnder Theorie, nicht an mangelnder Mathe/Analyse, krankt
+

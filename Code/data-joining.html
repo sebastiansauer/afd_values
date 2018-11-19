@@ -482,6 +482,18 @@ if (params$verbose == TRUE) glimpse(d_short_nona_1000)
 #&gt; $ east_num              &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1...
 #&gt; $ state_id              &lt;int&gt; 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, ...</code></pre>
 </div>
+<div id="join-election-data-with-zip-data" class="section level1">
+<h1>Join election data with zip data</h1>
+<pre class="r"><code>d_zip &lt;- d_short_nona %&gt;% 
+  left_join(zip, by = c(&quot;area_name&quot; = &quot;Wahlkreis_Name&quot;))</code></pre>
+<p>Note that a left join was performed.</p>
+</div>
+<div id="join-election-data-with-values-data" class="section level1">
+<h1>Join election data with values data</h1>
+<pre class="r"><code>
+d_joined &lt;- d_zip %&gt;% 
+  left_join(values, by = c(&quot;PLZ&quot; = &quot;PLZ&quot;))</code></pre>
+</div>
 
 
 
