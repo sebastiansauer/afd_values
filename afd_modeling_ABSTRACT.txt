@@ -5,9 +5,12 @@ The party "Alternative fuer Deutschland" (AfD) is a novel party
 that has managed to gain seats in all states parliaments as well as in the federal parliament. 
 Such striking success in quite unique in German post-war politics.
 Such grand scales changes has sparked a considerably debate as to the why and hows. 
-A number of causes has been brought forward both by scholars but also some "folk theories" circulate. 
+A number of causes has been brought forward both by scholars 
+but also some "folk theories" circulate. 
 In this talk, we test some folk theories including potential causes of AfD success such unemployment, migration rate, age, and east/west differences. 
-Our study is novel insofar as a more rigorous bayesian multilevel modeling is applied. In addition, we include large-scale personality data (n = 22,000) which was not available for previous study.
+Our study is novel insofar as a more rigorous bayesian multilevel modeling is applied. 
+In addition, we include large-scale personality data (n = 22,000) 
+which was not available for previous study.
 Our result provide little evidence for the validity of typical folk theories. 
 We interpret the data that such theories should be abandoned. 
 Moreover, personality trait did not explain much election behavior either. 
