@@ -317,3 +317,10 @@ d_joined %>%
 ```
 
 
+# Summarise zu PLZ level
+
+
+```{r}
+
+```
+
