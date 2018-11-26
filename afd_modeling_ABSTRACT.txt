@@ -9,11 +9,11 @@ A number of causes has been brought forward both by scholars
 but also some "folk theories" circulate. 
 In this talk, we test some folk theories including potential causes of AfD success such unemployment, migration rate, age, and east/west differences. 
 Our study is novel insofar as a more rigorous bayesian multilevel modeling is applied. 
-In addition, we include large-scale personality data (n = 22,000) 
+In addition, we include large-scale human behavioral data (n = 22,000) 
 which was not available for previous study.
 Our result provide little evidence for the validity of typical folk theories. 
 We interpret the data that such theories should be abandoned. 
-Moreover, personality trait did not explain much election behavior either. 
+Moreover, value driven human behaviour trait did not explain much election behavior either. 
 Explanation for this finding are discussed alongside with recommendations for future research.
 
 
