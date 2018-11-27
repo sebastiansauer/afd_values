@@ -8,7 +8,7 @@ The AfD became the third-largest party in Germany after the 2017 federal electio
 Such striking success in quite unique in German post-war politics.
 Consequently, AfD's upsurge has sparked an intensive debate as to the why and hows 
 of this success. 
-Some explanations of AfD's electoral success has been brought forward by scholars 
+Some explanations of AfD's electoral success have been brought forward by scholars 
 but also some "folk theories" circulate. 
 In this talk, we test some folk theories highlighting potential causes of AfD electoral success 
 such as unemployment, migration rate, age, and east/west cultural differences. 
@@ -21,6 +21,6 @@ In sum, our result provide little evidence for the validity of typical folk theo
 We interpret the results that such folk theories should be abandoned. 
 Moreover, value driven human behavior trait did not explain much election behavior either. 
 It appears that voting success, particularly with regard to the AfD, is still far from begin understood properly.
-Explanation for this finding are discussed alongside with recommendations for future research.
+Explanations for this finding are discussed alongside with recommendations for future research.
 
 
