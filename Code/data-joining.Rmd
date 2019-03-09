@@ -38,6 +38,10 @@ library(sjmisc)
 library(viridis)
 library(pradadata)  # elec data
 library(tidyverse)
+library(knitr)
+
+library(rethinking)  # Bayes modeling
+
 ```
 
 
@@ -78,6 +82,12 @@ load("data_raw/Choughs2017.Rdata")
 values <- Choughs2017
 ```
 
+The variable `fit.cluster` shows the seven different value types:
+
+```{r}
+values$fit.cluster %>% unique()
+```
+
 
 
 ## Election data
@@ -100,7 +110,6 @@ Note that a code book is available for these data:
 
 ```{r data-socec-dict}
 data("socec_dict")
-
 ```
 
 
@@ -111,7 +120,6 @@ Third, we will make use of geo data in order to geoplot the modeling results. Th
 
 ```{r data-shp}
 data("wahlkreise_shp")
-
 ```
 
 
@@ -144,7 +152,7 @@ socec_renamed <- socec %>%
 ```
 
 
-Compute some more columns:
+Compute some more columns and remove missing vlaues:
 
 ```{r socec-new-cols}
 socec2 <- socec_renamed %>% 
@@ -170,7 +178,7 @@ elec_results2 <- elec_results %>%
 
 Note that we are focusing on the Zweitstimme of the present election (hence the `3` in `votes_valid_3` and in `AfD_3`).
 
-# Merge
+# Merge/Join socec data with election data
 
 
 ```{r merge}
@@ -182,11 +190,7 @@ socec2 %>%
 
 # After-merge preparations
 
-<!-- Now let's remove missings: -->
 
-<!-- ```{r drop-na} -->
-<!-- d_all <- drop_na(d_all_with_na) -->
-<!-- ``` -->
 
 Add variable for East (1) vs. West (0):
 
@@ -204,7 +208,7 @@ d_all_with_na$east_num <- ifelse(d_all_with_na$east == "yes", 1, 0)
 
 
 
-# Main data frame: d_short and d_short_X
+# Main data frame: d_short 
 
 We will also provide a version without the geo data, and in pure (old school) `data frame` form (ie., not as tibble)_
 
@@ -267,9 +271,11 @@ if (params$verbose == TRUE) glimpse(d_short_nona_1000)
 
 
 
-# Join election data with zip data
+# Join election data with zip data and values data LONG format
 
 
+
+## Join main data with zip codes data
 
 ```{r join-elec-with-zip}
 d_zip <- d_short_nona %>% 
@@ -279,12 +285,65 @@ d_zip <- d_short_nona %>%
 
 Note that a left join was performed.
 
-# Join election data with values data
+## Join election data with values data
 
 ```{r join-elec-with-values}
 
 d_joined <- d_zip %>% 
   left_join(values, by = c("PLZ" = "PLZ"))
+```
+
+
+
+
+# Join election data with zip data and values data SHORT format
+
+
+## Summarise values data to Wahlkreis levels
+
+Glimpse:
+
+```{r}
+values %>% 
+  head() %>% 
+  kable()
+```
+
+
+Compute proportion for each cluster for each wahlkreis.
+
+
+Helper function:
+
+```{r}
+count_wertetypen <- function(df){
+  df %>% 
+    mutate(wertetyp = as.character(fit.cluster)) %>% 
+    select(wertetyp, area_nr) %>% 
+    # drop_na() %>% 
+    count(wertetyp) %>% 
+    mutate(wertetyp_prop = n / sum(n)) %>% 
+    select(-n) %>% 
+    spread( key = wertetyp, value = wertetyp_prop) %>% 
+    mutate(group = area_nr[1])
+}
+```
+
+This function computes the proportion for each consumer type per area (plus one proportion for NA for each area).
+
+```{r}
+werte <- d_joined %>%
+  group_split(area_nr) %>%  # group by Wahlkreis 
+  map_dfr(count_wertetypen) %>% 
+  add_id("area_nr")
+```
+
+Now we join that to the n=299 data frame:
+
+```{r}
+d_joined_values <- d_short_nona %>% 
+  full_join(werte) %>% 
+  rename(type_unknown = "<NA>")
 ```
 
 
@@ -317,10 +376,25 @@ d_joined %>%
 ```
 
 
-# Summarise zu PLZ level
 
+
+
+# Write final/output data to file
+
+The long file:
 
 ```{r}
+d_joined_long_final <- d_joined
 
+write_csv(d_joined_long_final, 
+          path = "objects/d_joined_long_final.csv")
+```
+
+
+The short file:
+
+```{r}
+write_csv(d_joined_values,
+          path = "objects/d_joined_values.csv")
 ```
 
