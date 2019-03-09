@@ -1,0 +1,114 @@
+---
+title: "Data preparation"
+author: "Ich"
+date: "3/9/2019"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+
+
+```{r knitr-setup}
+knitr::opts_chunk$set(
+  comment = "#>",
+  collapse = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  cache = TRUE,
+  out.width = "70%",
+  fig.align = 'center',
+  fig.width = 6,
+  fig.asp =  0.4,  #0.618,  # 1 / phi
+  fig.show = "hold",
+  size = "tiny"
+)
+
+```
+
+
+
+# Load packages
+
+
+```{r}
+library(sjmisc)
+library(viridis)
+library(pradadata)  # elec data
+library(tidyverse)
+library(knitr)
+
+library(rethinking)  # Bayes modeling
+
+```
+
+
+# Load data
+
+
+```{r}
+d <- read_csv("objects/d_joined_values.csv")
+```
+
+
+# Rename variables
+
+Value type variable names:
+
+```{r}
+value_types <- c("Genieser", "Harmoniesuchende", "Hedonisten", 
+                 "Selbstbestimmte", "Werschätzenden", 
+                 "type_unknown", "Konformisten",
+                 "Verantwortungsverweiterer")
+```
+
+Rename all seven types:
+
+```{r}
+d_renamed <- d %>% 
+  rename(enjoyer = Genieser,
+         harmony_seeker = Harmoniesuchende,
+         hedonist = Hedonisten,
+         self_determined = Selbstbestimmte,
+         appreciater = Werschätzenden,
+         conformist = Konformisten,
+         responsibility_denier = Verantwortungsverweiterer)
+```
+
+
+Here's the list as a string vector:
+
+```{r}
+consumer_types <- c("enjoyer", "harmony_seeker",
+                    "hedonist", "self_determined",
+                    "appreciater", "type_unknown",
+                    "conformist", "responsibility_denier")
+```
+
+
+
+
+
+# z-standardize
+
+
+```{r d-short-z}
+d_renamed %>% 
+  sjmisc::std() %>%  
+  select(-c(state_z, area_nr_z, area_name_z, 
+            state_id_z, east_z, east_num_z, 
+            paste0(consumer_types, "_z"))) -> d_short_z
+
+names(d_short_z)
+```
+
+
+# Save data
+
+
+```{r}
+write_csv(d_short_z,
+          path = "objects/d_prepared.csv")
+```
+
+

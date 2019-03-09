@@ -1,0 +1,190 @@
+---
+title: "Data modeling"
+author: "Ich"
+date: "3/9/2019"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+
+
+```{r knitr-setup}
+knitr::opts_chunk$set(
+  comment = "#>",
+  collapse = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  cache = TRUE,
+  out.width = "70%",
+  fig.align = 'center',
+  fig.width = 6,
+  fig.asp =  0.4,  #0.618,  # 1 / phi
+  fig.show = "hold",
+  size = "tiny"
+)
+
+```
+
+
+
+# Load packages
+
+
+```{r}
+library(sjmisc)
+library(viridis)
+library(pradadata)  # elec data
+library(tidyverse)
+library(knitr)
+
+library(rethinking)  # Bayes modeling
+
+```
+
+
+# Load data
+
+
+```{r}
+d <- read_csv("objects/d_prepared.csv")
+```
+
+
+# Helper stuff
+
+```{r}
+standard_model_vars <- c("afd_prop", "for_prop_z", "unemp_prop_z", "east")
+consumer_types <- c("enjoyer", "harmony_seeker",
+                    "hedonist", "self_determined",
+                    "appreciater", "type_unknown",
+                    "conformist", "responsibility_denier")
+```
+
+
+
+```{r my-traceplot}
+my_traceplot <- function(model) {
+  rstan::traceplot(model@stanfit, pars=names(model@start[[1]]))
+}
+```
+
+
+# Modeling
+
+## model output list
+
+I use this list to store the model outputs.
+
+```{r}
+models <- list()
+```
+
+
+
+
+# Normal null model (model 00)
+
+
+```{r m16-stan, eval = TRUE, results = "hide"}
+d_model <- d[, c("afd_prop"), drop = FALSE]
+
+m0 <- map2stan(
+  alist(
+    afd_prop ~ dnorm(mu, sigma),    
+    mu <- alpha,
+    alpha ~ dnorm(0, 1),
+    sigma ~ dnorm(0, 1)
+  ),
+  data = d_model,
+  chains = 2
+)
+```
+
+
+
+```{r}
+precis(m0, depth = 2)
+coeftab(m0)
+my_traceplot(m0)
+models[["m0"]] <-m0
+
+```
+
+
+
+
+
+
+## Model 01
+
+
+```{r m9-stan, error = TRUE, results = "hide"}
+d_model <- d %>% 
+  select(one_of(c(consumer_types, standard_model_vars))) %>% 
+  drop_na() %>% 
+  as.data.frame()
+
+class(d_model)
+
+
+m1 <- map2stan(
+  alist(
+    afd_prop ~ dnorm(mu, sigma),
+    mu <-  beta0[east] +  beta1*for_prop_z + beta2*unemp_prop_z,
+    beta0[east] ~ dnorm(0, 1),
+    beta1 ~ dnorm(0, 1),
+    beta2 ~ dnorm(0, 1),
+   
+    sigma ~ dnorm(0, 1)
+  ),
+  data = d_model,
+  chains = 1,
+  cores = 1
+)
+
+m1 <- map2stan(
+  alist(
+    afd_prop ~ dnorm(mu, sigma),
+    mu <-  beta0[east] +  beta1*for_prop_z + beta2*unemp_prop_z + 
+      beta3*enjoyer + beta4*harmony_seeker + beta5*self_determined +
+      beta6*appreciater + beta7*conformist + beta8*type_unknown +
+      beta9*responsibility_denier,
+    beta0[east] ~ dnorm(0, 1),
+    beta1 ~ dnorm(0, 1),
+    beta2 ~ dnorm(0, 1),
+    beta3 ~ dnorm(0, 1),   
+    beta4 ~ dnorm(0, 1),    
+    beta5 ~ dnorm(0, 1),    
+    beta6 ~ dnorm(0, 1),
+    beta7 ~ dnorm(0, 1),
+    beta8 ~ dnorm(0, 1),
+    beta9 ~ dnorm(0, 1),
+    sigma ~ dnorm(0, 1)
+  ),
+  data = d_model,
+  chains = 2,
+  cores = 1
+)
+```
+
+Check the results:
+
+```{r}
+my_traceplot(m1)
+precis(m1, depth = 2)
+models[["m1"]] <- m1
+WAIC(m1)
+```
+
+
+
+
+# Save results
+
+
+```{r}
+save(models, 
+     file = "objects/models.Rda")
+```
+
