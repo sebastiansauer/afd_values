@@ -758,7 +758,7 @@ Apply the function on all models:
 ```{r comp-all-model-errors, results = "hide"}
 model_error <- lapply(models79, comp_error, data = d79)
 
-model_error
+names(model_error) <- names(models79)
 ```
 
 
@@ -904,7 +904,7 @@ polygon_pos <- data.frame(
   value = c("underestimates", "underestimates", "underestimates", "overestimates", "overestimates", "overestimates", "overestimates")
 )
  
-d_short_w_pred_err %>%  
+p_d_short_w_pred_err <- d_short_w_pred_err %>%  
   ggplot() +
   aes(x = afd_prop, y = estimate) +
   geom_abline(slope = 1, intercept = 0, color = "grey60") +
@@ -922,9 +922,163 @@ d_short_w_pred_err %>%
   guides(fill = FALSE) +
   theme_classic()
 
+p_d_short_w_pred_err
+
+
 ggsave("img/modelest-vs-obs.pdf", width = 10, height = 5)
 
 ```
+
+
+
+
+
+
+# Check posterior distribution of predictors
+
+Let's have a look at the posterior distribution of the `best_model`.
+
+```{r}
+post_best_model <- extract.samples(models[[best_model_name]])
+```
+
+
+This object is a list. Let's convert it to a data frame for easier plotting.
+
+```{r}
+post_best_model_df <- tibble(
+  sigma = post_best_model[["sigma"]],
+  sigma2 = post_best_model[["sigma2"]],
+  beta1 = post_best_model[["beta1"]],
+  beta2= post_best_model[["beta2"]]
+)
+```
+
+And now we plot a number of histograms:
+
+```{r}
+post_best_model_df %>% 
+  gather() %>%  
+  rename(coef = key) %>% 
+  ggplot() +
+  aes(x = value) +
+  facet_wrap(~coef, scales = "free") +
+  theme_classic() + 
+  geom_histogram() -> p_post_best_model
+p_post_best_model
+```
+
+
+Now compute summary statistics:
+
+```{r}
+post_best_model_df %>% 
+  gather() %>% 
+  rename(coef = key) %>% 
+  group_by(coef) %>% 
+  summarise(q05 = quantile(value, .05),
+            q50 = quantile(value, .5),
+            q95 = quantile(value, .95),
+            value = mean(value)
+  )  -> post_best_model_df_sum
+  #gather(key = my_quantile, value = value, -coef) -> post_best_model_df_sum
+
+head(post_best_model_df_sum)
+```
+
+
+Now plot both:
+
+```{r}
+p_post_best_model +
+  geom_rect(data = post_best_model_df_sum,
+              aes(xmin = q05,
+                  xmax = q95,
+                  ymin = 0,
+                  ymax = Inf),
+            fill = "red",
+            alpha = .2) +
+  theme(axis.text.y=element_blank(),
+        axis.ticks.y = element_blank()) +
+  theme_classic() + 
+  labs(title = best_model_name,
+       y = "",
+       caption = "Note. Shaded areas demark 90% mass intervals")
+
+ggsave("img/p-post-best-model.pdf")
+```
+
+
+
+
+# Check linearity assumption
+
+
+
+Let's compute the predictions for each model:
+
+
+
+```{r fun-comp-preds}
+
+model_predictions <- lapply(models79, link)
+ 
+```
+
+
+Now plot the predictions against the error, as advised by Gelman and Hill.
+
+First, get predictions of the best moel:
+
+```{r}
+model_predictions[[best_model_name]] %>% 
+  as_tibble %>% 
+  summarise_all(mean) %>% 
+  gather() -> best_model_preds
+
+```
+
+Each observation is one *row*  in this data frame.
+
+Similarly, get errors of the best model:
+
+
+```{r}
+model_error[[best_model_name]] %>% 
+  as_tibble() %>% 
+  rename(error = value) %>% 
+  mutate(pred = best_model_preds$value) -> best_model_pred_err
+  
+p_best_model_pred_err <- best_model_pred_err %>% 
+  ggplot() +
+  aes(x = pred, y = error) +
+  geom_hline(yintercept = quantile(best_model_pred_err$error, .5),
+             color = "grey60") +
+  geom_hline(yintercept = quantile(best_model_pred_err$error, .975),
+             color = "grey80", , linetype = "dashed") +
+  geom_hline(yintercept = quantile(best_model_pred_err$error, .025),
+             color = "grey80", , linetype = "dashed") +
+  geom_point() +
+  theme_classic() +
+  labs(title = best_model_name,
+       xlab = "Model predictions",
+       ylab = "Model error",
+       caption = "Note. Horizontal lines denote .025, .5, and .975 quantiles, respectively") 
+
+best_model_pred_err 
+
+ 
+ggsave("best-model-pred-err.pdf")
+```
+
+
+
+
+
+
+
+
+
 
 
 # Save results
@@ -957,6 +1111,9 @@ save(model_error_IQR_df,
 save(model_error_md_iqr, 
      file = "objects/model_error_md_iqr.RDa")
 
+
+save(best_model_preds, 
+     file = "objects/best_model_preds.Rda")
 
 
 ```
