@@ -670,7 +670,20 @@ models79 <- list(models[["m0a"]], models[["m0b"]],
                  models[["m2a"]], models[["m2b"]],
                  models[["m3a"]], models[["m3b"]],
                  models[["m4a"]], models[["m4b"]])
-```
+
+models79 <- models[c("m0a", "m0b",
+                     "m1a", "m1b",
+                     "m2a", "m2b",
+                     "m3a", "m3b",
+                     "m4a", "m4b")]
+
+length(models79)
+
+names(models79)
+
+model_names <- names(models79)
+
+``
 
 
 
@@ -703,6 +716,9 @@ best_model_name <-
   best_model %>%
   pull(model_name)
 
+best_model_name
+
+if (best_model_name == 'models[[\"m4a\"]]') best_model_name = "m4a"
 best_model_name
 ```
 
@@ -770,9 +786,145 @@ modell_error_IQR
 
 
 
+# Visualizing prediction error
+
+Some preparation:
+
+```{r prepare-error-data}
+model_error %>% 
+    as.data.frame() -> model_error_df
+
+
+names(model_error_df) <- names(models79)
+
+model_error_df %>% 
+  mutate(afd_prop = d79$afd_prop,
+         id = 1:nrow(model_error_df)) -> model_error_df
+
+
+modell_error_IQR %>% 
+  as.data.frame() -> model_error_IQR_df
+
+
+names(model_error_IQR_df) <- names(models79)
+
+model_error_IQR_df %>% 
+  mutate(id = 1:nrow(model_error_IQR_df)) -> model_error_IQR_df
+
+```
 
 
 
+Convert to long version for plotting:
+
+```{r convert-error-data}
+model_error_IQR_df %>% 
+  gather(key = model, value = iqr, -c(id)) %>% 
+  mutate(stat = "IQR") -> model_error_IQR_df_long
+
+
+model_error_df %>% 
+  gather(key = model, value = error, -c(afd_prop, id)) %>% 
+  mutate(stat = "median") -> model_error_df_long
+
+model_error_df_long %>% 
+  bind_rows(model_error_IQR_df_long) -> model_error_long
+
+
+model_error_df_long %>% 
+  left_join(model_error_IQR_df_long, by = c("id", "model")) %>% 
+  select(-c(stat.x, stat.y)) -> model_error_md_iqr
+
+glimpse(model_error_md_iqr)
+
+```
+
+
+Now plot:
+
+```{r plot-model-error, out.width = "100%"}
+
+
+as_tibble(md_abs_error_all_models) %>% 
+  mutate(model = model_names,
+         best_model = ifelse(model_names == best_model_name, TRUE, FALSE)) -> md_abs_error_all_models
+
+glimpse(md_abs_error_all_models)
+
+p_model_error_md_iqr <- model_error_md_iqr %>% 
+  arrange(-error) %>% 
+  ggplot(aes(x = id)) +
+  facet_wrap(~model) +
+  geom_hline(aes(yintercept = value), data = md_abs_error_all_models) +
+    geom_errorbar(aes(ymin = error - (iqr/2),
+                    ymax = error + (iqr/2)),
+                alpha = .3,
+                color = "gray40") +
+  geom_point(aes(y = error), alpha = .1) +
+  geom_label(aes(label = round(value, 3),
+                 color = best_model), x = 1, y = .2, 
+            data = md_abs_error_all_models, 
+            hjust = 0) +
+  guides(color=FALSE) +
+  theme_classic() +
+  labs(x = "ID of electorial district",
+       y = "(absolute) prediction error")
+  scale_color_manual(values = c("red", "darkgreen"))
+  
+p_model_error_md_iqr
+
+ggsave(filename = "img/model-error-comp.pdf")
+```
+
+
+
+
+
+
+# Plotting prediction error against observed values
+
+
+```{r p-obs-est-err-values, out.width="100%"}
+posterior_per_person_best_model <- link(models[["m4a"]])
+  
+posterior_per_person_best_model %>%  
+  as_tibble() %>% 
+    summarise_all(median) %>% 
+    gather() %>% 
+    rename(estimate = value) %>% 
+  add_column(area_nr = 1:nrow(.)) %>% 
+  full_join(d79) %>%
+  mutate(error = abs(estimate - afd_prop),
+         top05 = percent_rank(error) >= .95) -> d_short_w_pred_err 
+
+
+polygon_pos <- data.frame(
+  x = c(0, 0.4, 0.4,    0, 0.4, 0, 0 ),
+  y = c(0, 0, 0.4,      0, 0.4, 0.4, 0),
+  value = c("underestimates", "underestimates", "underestimates", "overestimates", "overestimates", "overestimates", "overestimates")
+)
+ 
+d_short_w_pred_err %>%  
+  ggplot() +
+  aes(x = afd_prop, y = estimate) +
+  geom_abline(slope = 1, intercept = 0, color = "grey60") +
+  geom_polygon(data = polygon_pos, aes(x = x, y = y, fill = value), alpha = .1) +
+  geom_point(aes(color = error,
+                 shape = east),
+             alpha = .6,
+             size = 2) +
+  ggrepel::geom_label_repel(aes(label = area_name), data = filter(d_short_w_pred_err, top05 == TRUE)) +
+  annotate("text", x = 0.4, y = 0, label = "model understimates", hjust = 1, vjust = 0) +
+  annotate("text", x = 0, y = 0.4, label = "model overestimates", hjust = 0, vjust = 1) +
+  labs(x = "Observed AfD votes (proportion)",
+       y = "Estimated AfD votes (proportion)",
+       caption = "n=79 electoral districts; data provided by Bundeswahlleiter 2017") +
+  guides(fill = FALSE) +
+  theme_classic()
+
+ggsave("img/modelest-vs-obs.pdf", width = 10, height = 5)
+
+```
 
 
 # Save results
@@ -793,5 +945,19 @@ save(model_error,
 
 save(modell_error_IQR, 
      file = "objects/modell_error_IQR.Rda")
+
+
+save(model_error_df, 
+     file = "objects/model_error_df.RDa")
+
+save(model_error_IQR_df, 
+     file = "objects/model_error_IQR_df.RDa")
+
+
+save(model_error_md_iqr, 
+     file = "objects/model_error_md_iqr.RDa")
+
+
+
 ```
 
