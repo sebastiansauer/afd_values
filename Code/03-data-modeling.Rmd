@@ -37,6 +37,7 @@ library(viridis)
 library(pradadata)  # elec data
 library(tidyverse)
 library(knitr)
+library(tidylog)
 
 library(rethinking)  # Bayes modeling
 
@@ -45,9 +46,33 @@ library(rethinking)  # Bayes modeling
 
 # Load data
 
+Raw data:
 
 ```{r}
 d <- read_csv("objects/d_prepared.csv")
+d <- as.data.frame(d)
+```
+
+
+And now the data frame with the reduced sample size of n=79,
+because that's the number of complete rows for the modeling variables. 
+
+However, we let all variables remain in the dataframe for computing prediction error later on.
+
+```{r}
+d79 <- d %>% 
+  drop_na(one_of(c(consumer_types, standard_model_vars))) %>% 
+  as.data.frame()
+
+dim(d)
+dim(d79)
+```
+
+
+objects from models:
+
+```{r}
+load("objects/models.Rda")
 ```
 
 
@@ -77,17 +102,19 @@ my_traceplot <- function(model) {
 I use this list to store the model outputs.
 
 ```{r}
-models <- list()
+if (!(exists("models"))) models <- list()
 ```
 
 
+## Null models
 
 
-# Normal null model (model 00)
+### Normal null model (model 00)
 
 
-```{r m16-stan, eval = TRUE, results = "hide"}
+```{r m0, eval = TRUE, results = "hide"}
 d_model <- d[, c("afd_prop"), drop = FALSE]
+nrow(d_model)
 
 m0 <- map2stan(
   alist(
@@ -108,7 +135,66 @@ precis(m0, depth = 2)
 coeftab(m0)
 my_traceplot(m0)
 models[["m0"]] <-m0
+```
 
+
+### m0a: Normal null model (model 00) with reduced sample size
+
+```{r m0a, eval = TRUE, results = "hide"}
+d_model <- d79
+nrow(d_model)
+
+m0a <- map2stan(
+  alist(
+    afd_prop ~ dnorm(mu, sigma),    
+    mu <- alpha,
+    alpha ~ dnorm(0, 1),
+    sigma ~ dnorm(0, 1)
+  ),
+  data = d_model,
+  chains = 2
+)
+```
+
+
+```{r}
+precis(m0a, depth = 2)
+coeftab(m0a)
+my_traceplot(m0a)
+models[["m0a"]] <-m0a
+WAIC(m0a)
+```
+
+
+
+### m0b: Normal null model (model 00) with reduced sample size, sigma as Cauchy
+
+```{r m0b, eval = TRUE, results = "hide"}
+d_model <- d %>% 
+  select(one_of(c(consumer_types, standard_model_vars))) %>% 
+  drop_na() %>% 
+  as.data.frame()
+nrow(d_model)
+
+m0b <- map2stan(
+  alist(
+    afd_prop ~ dnorm(mu, sigma),    
+    mu <- alpha,
+    alpha ~ dnorm(0, 1),
+    sigma ~ dcauchy(0, 1)
+  ),
+  data = d_model,
+  chains = 2
+)
+```
+
+
+```{r}
+precis(m0b, depth = 2)
+coeftab(m0b)
+my_traceplot(m0b)
+models[["m0b"]] <-m0b
+WAIC(m0b)
 ```
 
 
@@ -116,34 +202,23 @@ models[["m0"]] <-m0
 
 
 
-## Model 01
+## One level models
 
 
-```{r m9-stan, error = TRUE, results = "hide"}
+### Model 01a: - 8 consumer vars + unemp-z + foreign-z, REDUCED sample size
+
+
+
+```{r m1a, error = TRUE, results = "hide"}
 d_model <- d %>% 
   select(one_of(c(consumer_types, standard_model_vars))) %>% 
   drop_na() %>% 
   as.data.frame()
 
 class(d_model)
+nrow(d_model)
 
-
-m1 <- map2stan(
-  alist(
-    afd_prop ~ dnorm(mu, sigma),
-    mu <-  beta0[east] +  beta1*for_prop_z + beta2*unemp_prop_z,
-    beta0[east] ~ dnorm(0, 1),
-    beta1 ~ dnorm(0, 1),
-    beta2 ~ dnorm(0, 1),
-   
-    sigma ~ dnorm(0, 1)
-  ),
-  data = d_model,
-  chains = 1,
-  cores = 1
-)
-
-m1 <- map2stan(
+m1a <- map2stan(
   alist(
     afd_prop ~ dnorm(mu, sigma),
     mu <-  beta0[east] +  beta1*for_prop_z + beta2*unemp_prop_z + 
@@ -171,11 +246,531 @@ m1 <- map2stan(
 Check the results:
 
 ```{r}
-my_traceplot(m1)
-precis(m1, depth = 2)
-models[["m1"]] <- m1
-WAIC(m1)
+my_traceplot(m1a)
+precis(m1a, depth = 2)
+models[["m1a"]] <- m1a
+WAIC(m1a)
 ```
+
+
+
+### M01b: sigma cauchy distributed
+
+Now with sigma Cauchy distributed:
+
+```{r m1b, error = TRUE, results = "hide"}
+d_model <- d %>% 
+  select(one_of(c(consumer_types, standard_model_vars))) %>% 
+  drop_na() %>% 
+  as.data.frame()
+
+class(d_model)
+nrow(d_model)
+
+m1b <- map2stan(
+  alist(
+    afd_prop ~ dnorm(mu, sigma),
+    mu <-  beta0[east] +  beta1*for_prop_z + beta2*unemp_prop_z + 
+      beta3*enjoyer + beta4*harmony_seeker + beta5*self_determined +
+      beta6*appreciater + beta7*conformist + beta8*type_unknown +
+      beta9*responsibility_denier,
+    beta0[east] ~ dnorm(0, 1),
+    beta1 ~ dnorm(0, 1),
+    beta2 ~ dnorm(0, 1),
+    beta3 ~ dnorm(0, 1),   
+    beta4 ~ dnorm(0, 1),    
+    beta5 ~ dnorm(0, 1),    
+    beta6 ~ dnorm(0, 1),
+    beta7 ~ dnorm(0, 1),
+    beta8 ~ dnorm(0, 1),
+    beta9 ~ dnorm(0, 1),
+    sigma ~ dcauchy(0, 1)
+  ),
+  data = d_model,
+  chains = 2,
+  cores = 1
+)
+```
+
+Check the results:
+
+```{r}
+my_traceplot(m1b)
+precis(m1b, depth = 2)
+WAIC(m1b)
+models[["m1b"]] <- m1b
+```
+
+
+### Model 02 -  unemp-z + foreign-z NO consumer vars
+
+
+
+```{r m2, results = "hide"}
+d_model <- d[, c("afd_prop", "for_prop_z", "unemp_prop_z")]
+d_model <- as.data.frame(d_model)
+d_model <- d %>% 
+  select(one_of(c(consumer_types, standard_model_vars))) %>% 
+  drop_na() %>% 
+  as.data.frame()
+
+nrow(d_model)
+
+
+m2 <- map2stan(
+  alist(
+    afd_prop ~ dnorm(mu, sigma),
+    mu <- alpha +  beta1*for_prop_z + beta2*unemp_prop_z,
+    alpha ~ dnorm(0, 1),
+    beta1 ~ dnorm(0, 1),
+    beta2 ~ dnorm(0, 1),
+    sigma ~ dnorm(0, 1)
+  ),
+  data = d_model,
+  chains = 2,
+  cores = 2)
+```
+
+
+
+Check the results:
+
+```{r}
+my_traceplot(m2)
+precis(m2, depth = 2)
+models[["m2"]] <- m2
+WAIC(m2)
+```
+
+
+### M02a - reduced sample size
+
+Now with the reduced sample size:
+
+```{r m2a, results = "hide"}
+d_model <- d %>% 
+  select(one_of(c(consumer_types, standard_model_vars))) %>% 
+  drop_na() %>% 
+  as.data.frame()
+
+nrow(d_model)
+
+
+m2a <- map2stan(
+  alist(
+    afd_prop ~ dnorm(mu, sigma),
+    mu <- alpha +  beta1*for_prop_z + beta2*unemp_prop_z,
+    alpha ~ dnorm(0, 1),
+    beta1 ~ dnorm(0, 1),
+    beta2 ~ dnorm(0, 1),
+    sigma ~ dnorm(0, 1)
+  ),
+  data = d_model,
+  chains = 2,
+  cores = 2)
+```
+
+
+
+Check the results:
+
+```{r}
+my_traceplot(m2a)
+precis(m2a, depth = 2)
+models[["m2a"]] <- m2a
+WAIC(m2a)
+```
+
+### M02b - sigma Cauchy distributed
+
+
+
+```{r m2b, results = "hide"}
+d_model <- d %>% 
+  select(one_of(c(consumer_types, standard_model_vars))) %>% 
+  drop_na() %>% 
+  as.data.frame()
+
+nrow(d_model)
+
+
+m2b <- map2stan(
+  alist(
+    afd_prop ~ dnorm(mu, sigma),
+    mu <- alpha +  beta1*for_prop_z + beta2*unemp_prop_z,
+    alpha ~ dnorm(0, 1),
+    beta1 ~ dnorm(0, 1),
+    beta2 ~ dnorm(0, 1),
+    sigma ~ dcauchy(0, 1)
+  ),
+  data = d_model,
+  chains = 2,
+  cores = 2)
+```
+
+
+
+Check the results:
+
+```{r}
+my_traceplot(m2b)
+precis(m2b, depth = 2)
+models[["m2b"]] <- m2b
+WAIC(m2b)
+```
+
+
+
+## Multilevel (two levels)
+
+
+### M03: east + for_prop-z + unemp_prop-z
+
+```{r m3, eval = TRUE, results = "hide"}
+d_model <- d[, c("afd_prop", "for_prop_z", "unemp_prop_z", "east")]
+nrow(d_model)
+
+m3 <- map2stan(
+  alist(
+    afd_prop ~ dnorm(mu, sigma),    
+    mu <- beta0[east] +  beta1*for_prop_z + beta2*unemp_prop_z,
+    beta0[east] ~ dnorm(0, sigma2),
+    sigma ~ dnorm(0, 1),
+    beta1 ~ dnorm(0, 1),
+    beta2 ~ dnorm(0, 1),
+    sigma2 ~ dnorm(0, 1)
+  ),
+  data = d_model,
+  chains = 2,
+  cores = 2
+)
+```
+
+
+
+```{r}
+precis(m3, depth = 2)
+coeftab(m3)
+my_traceplot(m3)
+models[["m3"]] <- m3
+```
+
+### M03a: east + for_prop-z + unemp_prop-z REDUCED sample size
+
+```{r m3a, eval = TRUE, results = "hide"}
+d_model <- d %>% 
+  select(one_of(c(consumer_types, standard_model_vars))) %>% 
+  drop_na() %>% 
+  as.data.frame()
+
+nrow(d_model)
+
+m3a <- map2stan(
+  alist(
+    afd_prop ~ dnorm(mu, sigma),    
+    mu <- beta0[east] +  beta1*for_prop_z + beta2*unemp_prop_z,
+    beta0[east] ~ dnorm(0, sigma2),
+    sigma ~ dnorm(0, 1),
+    beta1 ~ dnorm(0, 1),
+    beta2 ~ dnorm(0, 1),
+    sigma2 ~ dnorm(0, 1)
+  ),
+  data = d_model,
+  chains = 2,
+  cores = 2
+)
+```
+
+
+
+```{r}
+precis(m3a, depth = 2)
+coeftab(m3a)
+my_traceplot(m3a)
+models[["m3a"]] <- m3a
+WAIC(m3a)
+```
+
+
+### M03b: east + for_prop-z + unemp_prop-z REDUCED sample size, CAUCHY
+
+```{r m3b, eval = TRUE, results = "hide"}
+d_model <- d %>% 
+  select(one_of(c(consumer_types, standard_model_vars))) %>% 
+  drop_na() %>% 
+  as.data.frame()
+
+nrow(d_model)
+
+m3b <- map2stan(
+  alist(
+    afd_prop ~ dnorm(mu, sigma),    
+    mu <- beta0[east] +  beta1*for_prop_z + beta2*unemp_prop_z,
+    beta0[east] ~ dnorm(0, sigma2),
+    sigma ~ dnorm(0, 1),
+    beta1 ~ dnorm(0, 1),
+    beta2 ~ dnorm(0, 1),
+    sigma2 ~ dcauchy(0, 1)
+  ),
+  data = d_model,
+  chains = 2,
+  cores = 2
+)
+```
+
+
+
+```{r}
+precis(m3b, depth = 2)
+coeftab(m3b)
+my_traceplot(m3b)
+models[["m3b"]] <- m3b
+WAIC(m3b)
+```
+
+
+
+
+
+### M04: state + for_prop-z + unemp_prop-z
+
+```{r m4, eval = TRUE, results = "hide"}
+d_model <- d[, c("afd_prop", "for_prop_z", "unemp_prop_z", "state_id")]
+nrow(d_model)
+
+m4 <- map2stan(
+  alist(
+    afd_prop ~ dnorm(mu, sigma),    
+    mu <- beta0[state_id] +  beta1*for_prop_z + beta2*unemp_prop_z,
+    beta0[state_id] ~ dnorm(0, sigma2),
+    sigma ~ dnorm(0, 1),
+    sigma2 ~ dnorm(0, 1),
+    beta1 ~ dnorm(0, 1),
+    beta2 ~ dnorm(0, 1)
+  ),
+  data = d_model,
+  chains = 2,
+  cores  = 2
+)
+```
+
+
+
+```{r out.width="100%"}
+precis(m4, depth = 2)
+coeftab(m4)
+my_traceplot(m4)
+models[["m4"]] <- m4
+```
+
+
+
+
+
+### M04a: state + for_prop-z + unemp_prop-z, REDUCED sample size
+
+
+
+```{r m4a, eval = TRUE, results = "hide"}
+d_model <- d %>% 
+  select(one_of(c(consumer_types, standard_model_vars, "state_id"))) %>% 
+  drop_na() %>% 
+  as.data.frame()
+
+nrow(d_model)
+
+m4a <- map2stan(
+  alist(
+    afd_prop ~ dnorm(mu, sigma),    
+    mu <- beta0[state_id] +  beta1*for_prop_z + beta2*unemp_prop_z,
+    beta0[state_id] ~ dnorm(0, sigma2),
+    sigma ~ dnorm(0, 1),
+    sigma2 ~ dnorm(0, 1),
+    beta1 ~ dnorm(0, 1),
+    beta2 ~ dnorm(0, 1)
+  ),
+  data = d_model,
+  chains = 2,
+  cores  = 2
+)
+```
+
+
+
+```{r out.width="100%"}
+precis(m4a, depth = 2)
+coeftab(m4a)
+my_traceplot(m4a)
+models[["m4a"]] <- m4a
+
+```
+
+
+### M04b: state + for_prop-z + unemp_prop-z, REDUCED sample size, Cauchy
+
+
+
+```{r m4b, eval = TRUE, results = "hide"}
+d_model <- d %>% 
+  select(one_of(c(consumer_types, standard_model_vars, "state_id"))) %>% 
+  drop_na() %>% 
+  as.data.frame()
+
+nrow(d_model)
+
+m4b <- map2stan(
+  alist(
+    afd_prop ~ dnorm(mu, sigma),    
+    mu <- beta0[state_id] +  beta1*for_prop_z + beta2*unemp_prop_z,
+    beta0[state_id] ~ dnorm(0, sigma2),
+    sigma ~ dnorm(0, 1),
+    sigma2 ~ dnorm(0, 1),
+    beta1 ~ dnorm(0, 1),
+    beta2 ~ dcauchy(0, 1)
+  ),
+  data = d_model,
+  chains = 2,
+  cores  = 2
+)
+```
+
+
+
+```{r out.width="100%"}
+precis(m4b, depth = 2)
+coeftab(m4b)
+my_traceplot(m4b)
+models[["m4b"]] <- m4b
+```
+
+
+
+# Check model object
+
+```{r}
+names(models)
+```
+
+
+# Model comparison
+
+## Compare null models:
+
+```{r}
+compare_null_models <- compare( models[["m0a"]], models[["m0b"]])
+compare_null_models
+```
+
+
+## Compare models of reduced sample size
+
+```{r}
+models79 <- list(models[["m0a"]], models[["m0b"]],
+                 models[["m1a"]], models[["m1b"]],
+                 models[["m2a"]], models[["m2b"]],
+                 models[["m3a"]], models[["m3b"]],
+                 models[["m4a"]], models[["m4b"]])
+```
+
+
+
+```{r}
+compare_reduced_sample <- compare(
+                                              models[["m0a"]], models[["m0b"]],
+                                              models[["m1a"]], models[["m1b"]],
+                                              models[["m2a"]], models[["m2b"]],
+                                              models[["m3a"]], models[["m3b"]],
+                                              models[["m4a"]], models[["m4b"]])
+compare_reduced_sample
+
+```
+
+
+# Get best model (Gaussian)
+
+Which model ist best? Let's define the model with the lowest WAIC as best:
+
+```{r}
+compare_reduced_sample@output %>% 
+  rownames_to_column(var = "model_name") %>%  
+  slice(which.min(WAIC)) -> best_model
+```
+
+And now extract the name of the best model:
+
+```{r}
+best_model_name <-
+  best_model %>%
+  pull(model_name)
+
+best_model_name
+```
+
+
+
+
+
+
+
+# Computing prediction errors
+
+
+Here's a function to compute the modeling error, defined as the absolute difference of the estimated model value (of afd proportion) minus the observed value (of afd proportion).
+
+
+```{r fun-comp-err}
+comp_error <- function(model, data, fun = mean) {
+  posterior_per_person <- link(model)
+  
+  
+  as_tibble(posterior_per_person) %>% 
+    summarise_all(fun) %>% 
+    gather() %>% 
+    rename(estimate = value) %>% 
+    mutate(afd_prop = data$afd_votes / data$votes_total,
+           error = abs(estimate - afd_prop)) %>% 
+    pull(error) -> error_vec
+  
+  return(error_vec)
+}
+
+```
+
+
+Apply the function on all models:
+
+```{r comp-all-model-errors, results = "hide"}
+model_error <- lapply(models79, comp_error, data = d79)
+
+model_error
+```
+
+
+Compute the median absolute error:
+
+
+```{r md-abs-err, results = "hide"}
+md_abs_error_all_models <- sapply(model_error, median) %>% unlist()
+md_abs_error_all_models
+
+```
+
+
+
+Also, compute the IQR of the errors:
+
+```{r iqr-abs-err, results = "hide"}
+modell_error_IQR <- lapply(models79, comp_error, fun = IQR, data = d79)
+modell_error_IQR
+```
+
+
+
+
+
+
+
+
 
 
 
@@ -186,5 +781,17 @@ WAIC(m1)
 ```{r}
 save(models, 
      file = "objects/models.Rda")
+
+save(compare_null_models,
+     file = "objects/compare_null_models.Rda")
+
+save(compare_reduced_sample,
+     file = "objects/compare_reduced_sample.Rda")
+
+save(model_error, 
+     file = "objects/model_error.Rda")
+
+save(modell_error_IQR, 
+     file = "objects/modell_error_IQR.Rda")
 ```
 

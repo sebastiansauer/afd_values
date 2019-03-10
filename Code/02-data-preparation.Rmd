@@ -37,6 +37,8 @@ library(viridis)
 library(pradadata)  # elec data
 library(tidyverse)
 library(knitr)
+library(mosaic)
+library(moments)  # skewness, kurtosis
 
 library(rethinking)  # Bayes modeling
 
@@ -101,6 +103,80 @@ d_renamed %>%
 
 names(d_short_z)
 ```
+
+
+
+# Check distribution of afd_prop (outcome)
+
+## afd_prop raw
+
+```{r results = "hold"}
+gf_dens(~afd_prop, data = d_short_z)
+gf_qqline(~afd_prop, data = d_short_z) %>% 
+  gf_qq(~afd_prop)
+```
+
+```{r}
+skewness(d_short_z$afd_prop)
+kurtosis(d_short_z$afd_prop)
+```
+
+
+That's not normally distributed. Let's try to normalize it:
+
+
+## afd_prop log
+
+```{r results = "hold"}
+gf_dens(~log(afd_prop), data = d_short_z)
+gf_qqline(~log(afd_prop), data = d_short_z) %>% 
+  gf_qq(~log(afd_prop), data = d_short_z)
+```
+
+```{r}
+skewness(log(d_short_z$afd_prop))
+kurtosis(log(d_short_z$afd_prop))
+```
+
+Skewness is good; kurtosis is good, since the kurtosis of the normal distribution is 3!
+
+Let's add this variable to thes datafrae:
+
+```{r}
+d_short_z <- d_short_z %>% 
+  mutate(afd_prop_log = log(afd_prop))
+```
+
+
+
+## afd_prop sqrt
+
+```{r results = "hold"}
+gf_dens(~sqrt(afd_prop), data = d_short_z)
+gf_qqline(~sqrt(afd_prop), data = d_short_z) %>% 
+  gf_qq(~sqrt(afd_prop), data = d_short_z)
+```
+
+
+## afd_prop $x^-1$
+
+```{r}
+gf_dens(~(afd_prop^-1), data = d_short_z)
+gf_qqline(~(afd_prop^-1), data = d_short_z) %>% 
+  gf_qq(~(afd_prop^-1))
+
+```
+
+
+## afd_prop $x^-2$
+
+```{r}
+gf_dens(~(afd_prop^-2), data = d_short_z)
+gf_qqline(~(afd_prop^-2), data = d_short_z) %>% 
+  gf_qq(~(afd_prop^-2))
+
+```
+
 
 
 # Save data
