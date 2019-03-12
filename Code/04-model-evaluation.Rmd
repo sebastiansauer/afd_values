@@ -4,7 +4,7 @@ author: "Ich"
 date: "3/9/2019"
 output: html_document
 params:
-  readonly: FALSE
+  readonly: TRUE
 editor_options: 
   chunk_output_type: console
 ---
@@ -21,12 +21,24 @@ knitr::opts_chunk$set(
   out.width = "70%",
   fig.align = 'center',
   fig.width = 6,
-  fig.asp =  0.4,  #0.618,  # 1 / phi
+  fig.asp =  0.618,  # 1 / phi
   fig.show = "hold",
   size = "tiny"
 )
 
 ```
+
+
+# Test of params
+
+```{r eval = params$readonly}
+
+cat("Readlonly is ")
+
+params$readonly
+```
+
+
 
 
 
@@ -42,11 +54,37 @@ library(knitr)
 library(tidylog)
 library(gghighlight)
 
-
+library(rprojroot)
 
 library(rethinking)  # Bayes modeling
 library("rstanarm")
 ```
+
+
+
+
+## Other setup
+
+
+```{r}
+proj_root <- rprojroot::find_root(as.root_criterion(is_rstudio_project))
+```
+
+
+## Change options
+
+
+```{rset-options}
+theme_set(theme_classic())
+
+options(ggplot2.continuous.colour="viridis")
+options(ggplot2.continuous.fill = "viridis")
+
+scale_colour_discrete <- scale_colour_viridis_d
+scale_fill_discrete <- scale_fill_viridis_d
+
+```
+
 
 
 
@@ -56,25 +94,15 @@ library("rstanarm")
 
 
 ```{r load-data}
-load("../objects/models.Rda")
+load(paste0(proj_root, "/objects/models.Rda"))
 
-d79 <- read.csv("../objects/d79.csv")
-d <- read_csv("../objects/d_prepared.csv")
+d79 <- read.csv(paste0(proj_root, "/objects/d79.csv"))
+d <- read_csv(paste0(proj_root, "/objects/d_prepared.csv"))
 ```
 
 
+# Setup
 
-# Change options
-
-
-```{rset-options}
-options(ggplot2.continuous.colour="viridis")
-options(ggplot2.continuous.fill = "viridis")
-
-scale_colour_discrete <- scale_colour_viridis_d
-scale_fill_discrete <- scale_fill_viridis_d
-
-```
 
 
 
@@ -88,10 +116,10 @@ names(models)
 
 # Model comparison
 
-## Compare null models:
+## Compare null models
 
 ```{r compare-null-models}
-compare_null_models <- compare( models[["m0a"]], models[["m0b"]])
+compare_null_models <- compare( models[["m0a"]], models[["m0b"]], models[["m0c"]])
 compare_null_models
 ```
 
@@ -113,7 +141,9 @@ models79 <- models[c("m0b",
                      "m1b",
                      "m2b",
                      "m3b",
-                     "m4b")]
+                     "m4b",
+                     "m5b",
+                     "m6b")]
 
 length(models79)
 
@@ -135,9 +165,23 @@ compare_reduced_sample <- compare(models[["m0b"]],
                                   models[["m1b"]],
                                   models[["m2b"]],
                                   models[["m3b"]],
-                                  models[["m4b"]])
-compare_reduced_sample
+                                  models[["m4b"]],
+                                  models[["m5b"]],
+                                  models[["m6b"]])
 
+model_comparison <- compare_reduced_sample@output %>% 
+  rownames_to_column() %>% 
+  as_tibble() %>% 
+  mutate(model = str_extract(rowname, "m\\d.")) %>% 
+  select(-rowname)
+
+model_comparison %>% kable()
+```
+
+
+```{r}
+write_csv(model_comparison,
+          path = paste0(proj_root, "/objects/model_comparison.csv")
 ```
 
 
@@ -179,9 +223,19 @@ best_model_name
 ## Describe best model
 
 ```{r}
-precis(models[[best_model_name]], depth = 2) 
+best_model_precis <- precis(models[[best_model_name]], depth = 2)@output
+
+write.csv(best_model_precis,
+          file = paste0(proj_root, "/objects/best_model_precis.csv"))
 ```
 
+
+## Save traceplot of most favorable model
+
+
+```{r}
+my_traceplot(models[[best_model_name]])
+```
 
 
 ## State names 
@@ -258,19 +312,28 @@ model_error_long <- model_error %>%
                                 TRUE, 
                                 FALSE)) 
 
-model_error_long %>% 
+p_mod_err_density <- model_error_long %>% 
   ggplot(aes(x = abs_error)) +
   facet_grid(. ~ model) +
   geom_density(aes(fill = is_best_model)) +
+  theme_classic() +
   labs(title = "Distribution of absolute prediction error per model",
        caption = "Note. Target variable is log. of AfD proportion (z-standardized)")
+p_mod_err_density
 
+ggsave(filename = paste0(proj_root, "/img/p_mod_err_density.png"),
+       width = 8, height = 4)
 
-model_error_long %>% 
+p_mod_err_boxplots <- model_error_long %>% 
   ggplot(aes(x = model, y= abs_error)) +
+  theme_classic() +
   geom_boxplot(aes(fill = is_best_model))  +
   labs(title = "Distribution of absolute prediction error per model",
        caption = "Note. Target variable is log. of AfD proportion (z-standardized)")
+p_mod_err_boxplots
+
+ggsave(filename = paste0(proj_root, "/img/p_mod_err_boxplots.png"),
+       width = 8, height = 4)
   
 ```
 
@@ -486,7 +549,10 @@ p_model_error_md_iqr <- model_error_md_iqr %>%
   
 p_model_error_md_iqr
 
-ggsave(filename = "../img/model-error-comp.pdf")
+
+ggsave(filename = paste0(proj_root, "/img/model-error-comp.png"),
+       width = 8, height = 4)
+ggsave(filename = paste0(proj_root, "/img/model-error-comp.pdf"))
 ```
 
 
@@ -525,13 +591,17 @@ p_d_short_w_pred_err <- d_short_w_pred_err %>%
   aes(x = afd_prop_log_z, y = estimate) +
   geom_abline(slope = 1, intercept = 0, color = "grey60") +
   geom_polygon(data = polygon_pos, aes(x = x, y = y, fill = value), alpha = .1) +
-  geom_point(aes(color = error,
-                 shape = east),
+  geom_point(data = filter(d_short_w_pred_err, top05 == TRUE),
+             color = "grey40",
              alpha = .6,
-             size = 2) +
+             size = 7) +
+  geom_point(aes(color = error,
+                 shape = top05),
+             alpha = .8,
+             size = 3) +
   ggrepel::geom_label_repel(aes(label = area_name), data = filter(d_short_w_pred_err, top05 == TRUE)) +
-  annotate("text", x = Inf, y = -Inf, label = "model understimates", hjust = 1, vjust = 0) +
-  annotate("text", x = -Inf, y = Inf, label = "model overestimates", hjust = 0, vjust = 1) +
+  annotate("text", x = 2, y = -2, label = "model understimates", hjust = 1, vjust = 0) +
+  annotate("text", x = -2, y = 2, label = "model overestimates", hjust = 0, vjust = 1) +
   labs(x = "Log. of observed AfD votes (z-standardized)",
        y = "Log. of estimated AfD votes (standardized)",
        title = "Modelled vs. observed AFD votes. Top 5 percent predicted errors are labelled",
@@ -542,8 +612,11 @@ p_d_short_w_pred_err <- d_short_w_pred_err %>%
 p_d_short_w_pred_err
 
 
-ggsave("../img/modelest-vs-obs.pdf", width = 10, height = 5)
+ggsave(paste0(proj_root, "/img/modelest-vs-obs.pdf", width = 10, height = 5))
 
+ggsave(plot = p_d_short_w_pred_err,
+       filename = paste0(proj_root, "/img/modelest-vs-obs.png"),
+                         width = 10, height = 5)
 ```
 
 
@@ -628,7 +701,9 @@ p_post_best_model +
        y = "",
        caption = "Note. Shaded areas demark 90% mass intervals")
 
-ggsave("../img/p-post-best-model.pdf")
+ggsave(paste0(proj_root, "/img/p-post-best-model.pdf"))
+ggsave(paste0(proj_root, "/img/p-post-best-model.png"),
+       width = 8, height = 4)
 ```
 
 
@@ -655,7 +730,11 @@ wahlkreise_shp %>%
        caption = "Data provided by the Bundeswahlleiter 2017") -> p_afd
 p_afd
 
-# ggsave("img/p-afd.pdf")
+ggsave(paste0(proj_root, "/img/p-afd.pdf"))
+
+ggsave(paste0(proj_root, "/img/p-afd.png"),
+       width = 8, height = 4)
+
 ```
 
 
@@ -674,7 +753,10 @@ wahlkreise_shp %>%
        caption = "Data provided by the Bundeswahlleiter 2017") -> p_unemp
 p_unemp
 
-# ggsave("img/p-unemp.pdf")
+# 
+ggsave(paste0(proj_root, "/img/p-unemp.pdf")
+ggsave(paste0(proj_root, "/img/p-unemp.png"),
+       width = 8, height = 4)       
 ```
 
 
@@ -692,7 +774,9 @@ wahlkreise_shp %>%
 
 p_foreign
 
-# ggsave("img/p-foreigners.pdf")
+# ggsave(paste0(proj_root, "/img/p-foreigners.pdf")
+ggsave(paste0(proj_root, "/img/p-foreign.png"),
+       width = 8, height = 4)
 ```
 
 
@@ -727,7 +811,9 @@ wahlkreise_shp %>%
 
 p_pred_error
 
-ggsave("../img/p_pred_error.pdf")
+ggsave(paste0(proj_root, "/img/p_pred_error.pdf"))
+ggsave(filename = paste0(proj_root, "/img/p_pred_error.png"),
+       width = 8, height = 4)
 ```
 
 
@@ -797,12 +883,21 @@ p_best_model_pred_err <- best_model_pred_err %>%
 p_best_model_pred_err 
 
  
-ggsave("../img/p_best_model_pred_err.pdf")
+ggsave(p_best_model_pred_err ,
+       paste0(proj_root, "/img/p_best_model_pred_err.pdf"))
+ggsave(plot = p_best_model_pred_err ,
+       filename = paste0(proj_root, "/img/p_best_model_pred_err.png"), width = 8, height = 4)
 ```
 
 
 
 
+
+# SessionInfo
+
+```{r}
+sessionInfo()
+```
 
 
 
@@ -813,43 +908,43 @@ ggsave("../img/p_best_model_pred_err.pdf")
 # Save results
 
 
-```{r}
+```{r eval = params$readonly}
 save(models, 
-     file = "../objects/models.Rda")
+     file = paste0(proj_root, "/objects/models.Rda"))
 
 save(compare_null_models,
-     file = "../objects/compare_null_models.Rda")
+     file = paste0(proj_root, "/objects/compare_null_models.Rda"))
 
 save(compare_reduced_sample,
-     file = "../objects/compare_reduced_sample.Rda")
+     file = paste0(proj_root, "/objects/compare_reduced_sample.Rda"))
 
 save(model_error, 
-     file = "../objects/model_error.Rda")
+     file = paste0(proj_root, "/objects/model_error.Rda"))
 
 save(modell_error_IQR, 
-     file = "../objects/modell_error_IQR.Rda")
+     file = paste0(proj_root, "/objects/modell_error_IQR.Rda"))
 
 
 save(model_error_df, 
-     file = "../objects/model_error_df.RDa")
+     file = paste0(proj_root, "/objects/model_error_df.RDa"))
 
 save(model_error_IQR_df, 
-     file = "../objects/model_error_IQR_df.RDa")
+     file = paste0(proj_root, "/objects/model_error_IQR_df.RDa"))
 
 
 save(model_error_md_iqr, 
-     file = "../objects/model_error_md_iqr.RDa")
+     file = paste0(proj_root, "/objects/model_error_md_iqr.RDa"))
 
 
 save(best_model_preds, 
-     file = "../objects/best_model_preds.Rda")
+     file = paste0(proj_root, "/objects/best_model_preds.Rda"))
 
 save(model_predictions,
-     file = "../objectsmodel_predictions.Rda")
+     file = paste0(proj_root, "/objectsmodel_predictions.Rda"))
 
 
 save(model_avg_predictions,
-     file = "../model_avg_predictions.Rda")
+     file = paste0(proj_root, "/model_avg_predictions.Rda"))
 
 
 ```

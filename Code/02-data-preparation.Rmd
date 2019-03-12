@@ -100,7 +100,9 @@ consumer_types <- c("enjoyer", "harmony_seeker",
 ## afd_prop raw
 
 ```{r results = "hold"}
-gf_dens(~afd_prop, data = d)
+p_afd_prop_dens <- gf_dens(~afd_prop, data = d) %>% 
+  gf_labs(title = paste0(" Skewness: ", round(skewness(d$afd_prop), 2),
+                         "; Kurtosis: ", round(kurtosis(d$afd_prop), 2)))
 gf_qqline(~afd_prop, data = d) %>% 
   gf_qq(~afd_prop)
 ```
@@ -117,7 +119,10 @@ That's not normally distributed. Let's try to normalize it:
 ## afd_prop log
 
 ```{r p-log, results = "hold"}
-gf_dens(~log(afd_prop), data = d)
+p_afd_prop_log_dens <- gf_dens(~log(afd_prop), data = d) %>% 
+  gf_labs(title = paste0(" Skewness: ", round(skewness(log(d$afd_prop)), 2),
+                         "; Kurtosis: ", round(kurtosis(log(d$afd_prop)), 2)))
+                         
 gf_qqline(~log(afd_prop), data = d) %>% 
   gf_qq(~log(afd_prop), data = d)
 ```
@@ -128,6 +133,16 @@ kurtosis(log(d$afd_prop))
 ```
 
 Skewness is good; kurtosis is good, since the kurtosis of the normal distribution is 3!
+
+
+```{r}
+library(gridExtra)
+
+grid.arrange(p_afd_prop_dens, p_afd_prop_log_dens, nrow = 1)
+
+
+```
+
 
 Let's add this variable to thes datafrae:
 

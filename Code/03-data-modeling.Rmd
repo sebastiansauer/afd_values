@@ -223,8 +223,39 @@ WAIC(m0b)
 
 
 
-## m0c: STAN null model
+## m0c: null model for afd_prop (not log, not z, just plain proportions)
 
+
+
+
+```{r m0c, eval = TRUE, results = "hide"}
+d_model <- d %>% 
+  select(one_of(c(consumer_types, standard_model_vars, "afd_prop"))) %>% 
+  drop_na() %>% 
+  as.data.frame()
+dim(d_model)
+
+m0c <- map2stan(
+  alist(
+    afd_prop ~ dnorm(mu, sigma),
+    mu <- alpha,
+    alpha ~ dnorm(0, 1),
+    sigma ~ dcauchy(0, 1)
+  ),
+  data = d_model,
+  chains = 2,
+  cores = 2
+)
+```
+
+
+```{r}
+precis(m0c, depth = 2)
+coeftab(m0c)
+my_traceplot(m0c)
+models[["m0c"]] <- m0c
+WAIC(m0c)
+```
 
 
 
@@ -690,6 +721,158 @@ prior_summary(object = m4b_stan)
 
 print(m4b_stan, digits = 2)
 ```
+
+
+
+
+
+
+### M5: state + foreing + unemp + consumer, outcome: afd_prop
+
+
+
+
+
+
+```{r m5, eval = TRUE, results = "hide"}
+d_model <- d %>% 
+  select(one_of(c(consumer_types, standard_model_vars, "state_id", "afd_prop"))) %>% 
+  drop_na() %>% 
+  as.data.frame()
+
+dim(d_model)
+
+m5 <- map2stan(
+  alist(
+    afd_prop ~ dnorm(mu, sigma),    
+    mu <- beta0[state_id] +  beta1*for_prop_z + beta2*unemp_prop_z,
+    beta0[state_id] ~ dnorm(0, sigma2),
+    sigma ~ dcauchy(0, 1),
+    sigma2 ~ dcauchy(0, 1),
+    beta1 ~ dnorm(0, 1),
+    beta2 ~ dnorm(0, 1)
+  ),
+  data = d_model,
+  chains = 2,
+  cores  = 2
+)
+```
+
+
+
+```{r out.width="100%"}
+precis(m5, depth = 2)
+coeftab(m5)
+my_traceplot(m5)
+models[["m5"]] <- m5
+
+pairs(m5)
+WAIC(m5)
+```
+
+
+
+### M5b: all predictors, state as multilevel
+
+
+```{r mb5}
+d_model <- d %>% 
+  select(one_of(c(consumer_types, standard_model_vars, "state_id"))) %>% 
+  drop_na() %>% 
+  as.data.frame()
+
+dim(d_model)
+
+m5b <- map2stan(
+  alist(
+    afd_prop_log_z ~ dnorm(mu, sigma),
+    mu <- beta0[state_id] +  beta1*for_prop_z + beta2*unemp_prop_z +
+      beta3*enjoyer + beta4*harmony_seeker + beta5*self_determined +
+      beta6*appreciater + beta7*conformist + beta8*type_unknown +
+      beta9*responsibility_denier,
+    beta0[state_id] ~ dnorm(0, sigma2),
+    sigma ~ dcauchy(0, 1),
+    sigma2 ~ dcauchy(0, 1),
+    beta1 ~ dnorm(0, 1),
+    beta2 ~ dnorm(0, 1),
+    beta3 ~ dnorm(0, 1),   
+    beta4 ~ dnorm(0, 1),    
+    beta5 ~ dnorm(0, 1),    
+    beta6 ~ dnorm(0, 1),
+    beta7 ~ dnorm(0, 1),
+    beta8 ~ dnorm(0, 1),
+    beta9 ~ dnorm(0, 1)
+  ),
+  data = d_model,
+  chains = 2,
+  cores  = 2
+)
+```
+
+
+
+```{r out.width="100%"}
+precis(m5b, depth = 2)
+coeftab(m5b)
+my_traceplot(m5b)
+models[["m5b"]] <- m5b
+
+WAIC(m5b)
+```
+
+
+
+
+### M6b: east (ML) + foreign + unemp + 8 consumer
+
+
+
+
+```{r m6b}
+d_model <- d %>% 
+  select(one_of(c(consumer_types, standard_model_vars, "east"))) %>% 
+  drop_na() %>% 
+  as.data.frame()
+
+dim(d_model)
+
+m6b <- map2stan(
+  alist(
+    afd_prop_log_z ~ dnorm(mu, sigma),
+    mu <- beta0[east] +  beta1*for_prop_z + beta2*unemp_prop_z +
+      beta3*enjoyer + beta4*harmony_seeker + beta5*self_determined +
+      beta6*appreciater + beta7*conformist + beta8*type_unknown +
+      beta9*responsibility_denier,
+    beta0[east] ~ dnorm(0, sigma2),
+    sigma ~ dcauchy(0, 1),
+    sigma2 ~ dcauchy(0, 1),
+    beta1 ~ dnorm(0, 1),
+    beta2 ~ dnorm(0, 1),
+    beta3 ~ dnorm(0, 1),   
+    beta4 ~ dnorm(0, 1),    
+    beta5 ~ dnorm(0, 1),    
+    beta6 ~ dnorm(0, 1),
+    beta7 ~ dnorm(0, 1),
+    beta8 ~ dnorm(0, 1),
+    beta9 ~ dnorm(0, 1)
+  ),
+  data = d_model,
+  chains = 2,
+  cores  = 2
+)
+```
+
+
+
+```{r out.width="100%"}
+precis(m6b, depth = 2)
+coeftab(m6b)
+my_traceplot(m6b)
+models[["m6b"]] <- m6b
+
+WAIC(m6b)
+```
+
 
 
 
