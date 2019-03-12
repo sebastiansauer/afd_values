@@ -63,6 +63,16 @@ because that's the number of complete rows for the modeling variables.
 
 However, we let all variables remain in the dataframe for computing prediction error later on.
 
+
+```{r}
+standard_model_vars <- c("afd_prop_log_z", "for_prop_z", "unemp_prop_z", "east")
+consumer_types <- c("enjoyer", "harmony_seeker",
+                    "hedonist", "self_determined",
+                    "appreciater", "type_unknown",
+                    "conformist", "responsibility_denier")
+```
+
+
 ```{r}
 d79 <- d %>% 
   drop_na(one_of(c(consumer_types, standard_model_vars))) %>% 
@@ -98,13 +108,6 @@ data("wahlkreise_shp")
 
 # Helper stuff
 
-```{r}
-standard_model_vars <- c("afd_prop", "for_prop_z", "unemp_prop_z", "east")
-consumer_types <- c("enjoyer", "harmony_seeker",
-                    "hedonist", "self_determined",
-                    "appreciater", "type_unknown",
-                    "conformist", "responsibility_denier")
-```
 
 
 
@@ -121,7 +124,7 @@ my_traceplot <- function(model) {
 
 I use this list to store the model outputs.
 
-```{r}
+```{r eval = param}
 if (!(exists("models"))) models <- list()
 ```
 
@@ -133,12 +136,12 @@ if (!(exists("models"))) models <- list()
 
 
 ```{r m0, eval = TRUE, results = "hide"}
-d_model <- d[, c("afd_prop"), drop = FALSE]
+d_model <- d[, c("afd_prop_log_z"), drop = FALSE]
 nrow(d_model)
 
 m0 <- map2stan(
   alist(
-    afd_prop ~ dnorm(mu, sigma),    
+    afd_prop_log_z ~ dnorm(mu, sigma),    
     mu <- alpha,
     alpha ~ dnorm(0, 1),
     sigma ~ dnorm(0, 1)
@@ -154,7 +157,7 @@ m0 <- map2stan(
 precis(m0, depth = 2)
 coeftab(m0)
 my_traceplot(m0)
-models[["m0"]] <-m0
+models[["m0"]] <- m0
 ```
 
 
@@ -166,7 +169,7 @@ nrow(d_model)
 
 m0a <- map2stan(
   alist(
-    afd_prop ~ dnorm(mu, sigma),    
+    afd_prop_log_z ~ dnorm(mu, sigma),    
     mu <- alpha,
     alpha ~ dnorm(0, 1),
     sigma ~ dnorm(0, 1)
@@ -181,7 +184,7 @@ m0a <- map2stan(
 precis(m0a, depth = 2)
 coeftab(m0a)
 my_traceplot(m0a)
-models[["m0a"]] <-m0a
+models[["m0a"]] <- m0a
 WAIC(m0a)
 ```
 
@@ -198,13 +201,14 @@ nrow(d_model)
 
 m0b <- map2stan(
   alist(
-    afd_prop ~ dnorm(mu, sigma),    
+    afd_prop_log_z ~ dnorm(mu, sigma),    
     mu <- alpha,
     alpha ~ dnorm(0, 1),
     sigma ~ dcauchy(0, 1)
   ),
   data = d_model,
-  chains = 2
+  chains = 2,
+  cores = 2
 )
 ```
 
@@ -213,9 +217,13 @@ m0b <- map2stan(
 precis(m0b, depth = 2)
 coeftab(m0b)
 my_traceplot(m0b)
-models[["m0b"]] <-m0b
+models[["m0b"]] <- m0b
 WAIC(m0b)
 ```
+
+
+
+## m0c: STAN null model
 
 
 
@@ -240,7 +248,7 @@ nrow(d_model)
 
 m1a <- map2stan(
   alist(
-    afd_prop ~ dnorm(mu, sigma),
+    afd_prop_log_z ~ dnorm(mu, sigma),
     mu <-  beta0[east] +  beta1*for_prop_z + beta2*unemp_prop_z + 
       beta3*enjoyer + beta4*harmony_seeker + beta5*self_determined +
       beta6*appreciater + beta7*conformist + beta8*type_unknown +
@@ -289,7 +297,7 @@ nrow(d_model)
 
 m1b <- map2stan(
   alist(
-    afd_prop ~ dnorm(mu, sigma),
+    afd_prop_log_z ~ dnorm(mu, sigma),
     mu <-  beta0[east] +  beta1*for_prop_z + beta2*unemp_prop_z + 
       beta3*enjoyer + beta4*harmony_seeker + beta5*self_determined +
       beta6*appreciater + beta7*conformist + beta8*type_unknown +
@@ -308,7 +316,7 @@ m1b <- map2stan(
   ),
   data = d_model,
   chains = 2,
-  cores = 1
+  cores = 2
 )
 ```
 
@@ -327,8 +335,6 @@ models[["m1b"]] <- m1b
 
 
 ```{r m2, results = "hide"}
-d_model <- d[, c("afd_prop", "for_prop_z", "unemp_prop_z")]
-d_model <- as.data.frame(d_model)
 d_model <- d %>% 
   select(one_of(c(consumer_types, standard_model_vars))) %>% 
   drop_na() %>% 
@@ -339,7 +345,7 @@ nrow(d_model)
 
 m2 <- map2stan(
   alist(
-    afd_prop ~ dnorm(mu, sigma),
+    afd_prop_log_z ~ dnorm(mu, sigma),
     mu <- alpha +  beta1*for_prop_z + beta2*unemp_prop_z,
     alpha ~ dnorm(0, 1),
     beta1 ~ dnorm(0, 1),
@@ -363,7 +369,7 @@ WAIC(m2)
 ```
 
 
-### M02a - reduced sample size
+### M02a - reduced sample size (Gaussian sigma)
 
 Now with the reduced sample size:
 
@@ -378,7 +384,7 @@ nrow(d_model)
 
 m2a <- map2stan(
   alist(
-    afd_prop ~ dnorm(mu, sigma),
+    afd_prop_log_z ~ dnorm(mu, sigma),
     mu <- alpha +  beta1*for_prop_z + beta2*unemp_prop_z,
     alpha ~ dnorm(0, 1),
     beta1 ~ dnorm(0, 1),
@@ -416,7 +422,7 @@ nrow(d_model)
 
 m2b <- map2stan(
   alist(
-    afd_prop ~ dnorm(mu, sigma),
+    afd_prop_log_z ~ dnorm(mu, sigma),
     mu <- alpha +  beta1*for_prop_z + beta2*unemp_prop_z,
     alpha ~ dnorm(0, 1),
     beta1 ~ dnorm(0, 1),
@@ -447,12 +453,12 @@ WAIC(m2b)
 ### M03: east + for_prop-z + unemp_prop-z
 
 ```{r m3, eval = TRUE, results = "hide"}
-d_model <- d[, c("afd_prop", "for_prop_z", "unemp_prop_z", "east")]
+d_model <- d[, c("afd_prop_log_z", "for_prop_z", "unemp_prop_z", "east")]
 nrow(d_model)
 
 m3 <- map2stan(
   alist(
-    afd_prop ~ dnorm(mu, sigma),    
+    afd_prop_log_z ~ dnorm(mu, sigma),    
     mu <- beta0[east] +  beta1*for_prop_z + beta2*unemp_prop_z,
     beta0[east] ~ dnorm(0, sigma2),
     sigma ~ dnorm(0, 1),
@@ -487,7 +493,7 @@ nrow(d_model)
 
 m3a <- map2stan(
   alist(
-    afd_prop ~ dnorm(mu, sigma),    
+    afd_prop_log_z ~ dnorm(mu, sigma),    
     mu <- beta0[east] +  beta1*for_prop_z + beta2*unemp_prop_z,
     beta0[east] ~ dnorm(0, sigma2),
     sigma ~ dnorm(0, 1),
@@ -524,10 +530,10 @@ nrow(d_model)
 
 m3b <- map2stan(
   alist(
-    afd_prop ~ dnorm(mu, sigma),    
+    afd_prop_log_z ~ dnorm(mu, sigma),    
     mu <- beta0[east] +  beta1*for_prop_z + beta2*unemp_prop_z,
     beta0[east] ~ dnorm(0, sigma2),
-    sigma ~ dnorm(0, 1),
+    sigma ~ dcauchy(0, 1),
     beta1 ~ dnorm(0, 1),
     beta2 ~ dnorm(0, 1),
     sigma2 ~ dcauchy(0, 1)
@@ -555,12 +561,12 @@ WAIC(m3b)
 ### M04: state + for_prop-z + unemp_prop-z
 
 ```{r m4, eval = TRUE, results = "hide"}
-d_model <- d[, c("afd_prop", "for_prop_z", "unemp_prop_z", "state_id")]
+d_model <- d[, c("afd_prop_log_z", "for_prop_z", "unemp_prop_z", "state_id")]
 nrow(d_model)
 
 m4 <- map2stan(
   alist(
-    afd_prop ~ dnorm(mu, sigma),    
+    afd_prop_log_z ~ dnorm(mu, sigma),    
     mu <- beta0[state_id] +  beta1*for_prop_z + beta2*unemp_prop_z,
     beta0[state_id] ~ dnorm(0, sigma2),
     sigma ~ dnorm(0, 1),
@@ -640,13 +646,13 @@ nrow(d_model)
 
 m4b <- map2stan(
   alist(
-    afd_prop ~ dnorm(mu, sigma),    
+    afd_prop_log_z ~ dnorm(mu, sigma),    
     mu <- beta0[state_id] +  beta1*for_prop_z + beta2*unemp_prop_z,
     beta0[state_id] ~ dnorm(0, sigma2),
-    sigma ~ dnorm(0, 1),
-    sigma2 ~ dnorm(0, 1),
+    sigma ~ dcauchy(0, 1),
+    sigma2 ~ dcauchy(0, 1),
     beta1 ~ dnorm(0, 1),
-    beta2 ~ dcauchy(0, 1)
+    beta2 ~ dnorm(0, 1)
   ),
   data = d_model,
   chains = 2,
@@ -686,660 +692,6 @@ print(m4b_stan, digits = 2)
 ```
 
 
-# Check model object
-
-```{r}
-names(models)
-```
-
-
-# Model comparison
-
-## Compare null models:
-
-```{r}
-compare_null_models <- compare( models[["m0a"]], models[["m0b"]])
-compare_null_models
-```
-
-
-## Compare models of reduced sample size
-
-```{r}
-models79 <- list(models[["m0a"]], models[["m0b"]],
-                 models[["m1a"]], models[["m1b"]],
-                 models[["m2a"]], models[["m2b"]],
-                 models[["m3a"]], models[["m3b"]],
-                 models[["m4a"]], models[["m4b"]])
-
-models79 <- models[c("m0a", "m0b",
-                     "m1a", "m1b",
-                     "m2a", "m2b",
-                     "m3a", "m3b",
-                     "m4a", "m4b")]
-
-length(models79)
-
-names(models79)
-
-model_names <- names(models79)
-
-``
-
-
-
-```{r}
-compare_reduced_sample <- compare(
-                                              models[["m0a"]], models[["m0b"]],
-                                              models[["m1a"]], models[["m1b"]],
-                                              models[["m2a"]], models[["m2b"]],
-                                              models[["m3a"]], models[["m3b"]],
-                                              models[["m4a"]], models[["m4b"]])
-compare_reduced_sample
-
-```
-
-
-# Best model
-
-
-## Get best model 
-
-Which model ist best? Let's define the model with the lowest WAIC as best:
-
-```{r}
-compare_reduced_sample@output %>% 
-  rownames_to_column(var = "model_name") %>%  
-  slice(which.min(WAIC)) -> best_model
-```
-
-And now extract the name of the best model:
-
-```{r}
-best_model_name <-
-  best_model %>%
-  pull(model_name)
-
-best_model_name
-
-if (best_model_name == 'models[[\"m4a\"]]') best_model_name = "m4a"
-if (best_model_name == 'models[[\"m4b\"]]') best_model_name = "m4b"
-best_model_name
-```
-
-
-
-
-## Describe best model
-
-```{r}
-precis(models[[best_model_name]], depth = 2)
-```
-
-
-Wait, what's the state names associated to the betas?
-
-
-
-```{r}
-d79 %>% 
-  distinct(state)
-```
-
-Hm, is this really the right order?
-
-What about this one?
-
-```{r}
-levels(factor(d79$state))
-```
-
-I assume this one makes more sense.
-
-
-
-## R-squared
-
-
-```{r}
-1 - var(resid(models[[best_model_name]])) / var(d79$afd_prop)
-```
-
-
-
-# Computing prediction errors
-
-
-
-## Helper function
-
-Here's a function to compute the modeling error, defined as the absolute difference of the estimated model value (of afd proportion) minus the observed value (of afd proportion).
-
-
-```{r fun-comp-err}
-comp_error <- function(model, data, fun = mean) {
-  posterior_per_person <- link(model)
-  
-  
-  as_tibble(posterior_per_person) %>% 
-    summarise_all(fun) %>% 
-    gather() %>% 
-    rename(estimate = value) %>% 
-    mutate(afd_prop = data$afd_votes / data$votes_total,
-           error = abs(estimate - afd_prop)) %>% 
-    pull(error) -> error_vec
-  
-  return(error_vec)
-}
-
-```
-
-
-Apply the function on all models:
-
-```{r comp-all-model-errors, results = "hide"}
-model_error <- lapply(models79, comp_error, data = d79)
-
-names(model_error) <- names(models79)
-```
-
-
-## Mean error of best model
-
-Add the MEAN error of THE BEST MODEL to the data frame:
-
-```{r}
-d79 <- d79 %>% 
-  mutate(err_avg = model_error[[best_model_name]])
-```
-
-
-
-## Median abolute error per model
-
-Compute the median absolute error:
-
-
-```{r md-abs-err, results = "hide"}
-md_abs_error_all_models <- sapply(model_error, median) %>% unlist()
-md_abs_error_all_models
-
-```
-
-The median absolute errors show the averaged absolute error (as per median) of for each predicted case.
-
-
-Also, compute the IQR of the errors:
-
-```{r iqr-abs-err, results = "hide"}
-modell_error_IQR <- lapply(models79, comp_error, fun = IQR, data = d79)
-modell_error_IQR
-```
-
-
-
-
-# Average prediction
-
-## Compute average prediction
-
-
-
-```{r fun-comp-err}
-comp_avg_pred <- function(model, data, fun = mean) {
-  
-  posterior_per_person <- link(model)
-  
-  
-  as_tibble(posterior_per_person) %>% 
-    summarise_all(fun) %>% 
-    gather() %>% 
-    rename(estimate = value) %>% 
-    pull(estimate) -> predictions_vec
-  
-  return(predictions_vec)
-}
-
-```
-
-
-Apply the function on all models:
-
-```{r comp-all-model-errors, results = "hide"}
-model_avg_predictions <- lapply(models79, comp_avg_pred, data = d79)
-
-names(model_avg_predictions) <- names(models79)
-```
-
-
-## Mean predcition of best model
-
-Add the MEAN error of THE BEST MODEL to the data frame:
-
-```{r}
-d79 <- d79 %>% 
-  mutate(pred_avg = model_avg_predictions[[best_model_name]])
-```
-
-
-
-
-
-
-## R squared of best model
-
-Attention this is the uncorrected overfitting prone R squared.
-
-
-```{r}
-
-
-r2_bestmodel <- 1 - var(d79$err_avg) / var(d79$afd_prop)
-r2_bestmodel
-
-```
-
-
-
-
-# Visualizing prediction error
-
-Some preparation:
-
-```{r prepare-error-data}
-model_error %>% 
-    as.data.frame() -> model_error_df
-
-
-names(model_error_df) <- names(models79)
-
-model_error_df %>% 
-  mutate(afd_prop = d79$afd_prop,
-         id = 1:nrow(model_error_df)) -> model_error_df
-
-
-modell_error_IQR %>% 
-  as.data.frame() -> model_error_IQR_df
-
-
-names(model_error_IQR_df) <- names(models79)
-
-model_error_IQR_df %>% 
-  mutate(id = 1:nrow(model_error_IQR_df)) -> model_error_IQR_df
-
-```
-
-
-
-Convert to long version for plotting:
-
-```{r convert-error-data}
-model_error_IQR_df %>% 
-  gather(key = model, value = iqr, -c(id)) %>% 
-  mutate(stat = "IQR") -> model_error_IQR_df_long
-
-
-model_error_df %>% 
-  gather(key = model, value = error, -c(afd_prop, id)) %>% 
-  mutate(stat = "median") -> model_error_df_long
-
-model_error_df_long %>% 
-  bind_rows(model_error_IQR_df_long) -> model_error_long
-
-
-model_error_df_long %>% 
-  left_join(model_error_IQR_df_long, by = c("id", "model")) %>% 
-  select(-c(stat.x, stat.y)) -> model_error_md_iqr
-
-glimpse(model_error_md_iqr)
-
-```
-
-
-Now plot:
-
-```{r plot-model-error, out.width = "100%"}
-
-
-as_tibble(md_abs_error_all_models) %>% 
-  mutate(model = model_names,
-         best_model = ifelse(model_names == best_model_name, TRUE, FALSE)) -> md_abs_error_all_models
-
-glimpse(md_abs_error_all_models)
-
-p_model_error_md_iqr <- model_error_md_iqr %>% 
-  arrange(-error) %>% 
-  ggplot(aes(x = id)) +
-  facet_wrap(~model) +
-  geom_hline(aes(yintercept = value), data = md_abs_error_all_models) +
-    geom_errorbar(aes(ymin = error - (iqr/2),
-                    ymax = error + (iqr/2)),
-                alpha = .3,
-                color = "gray40") +
-  geom_point(aes(y = error), alpha = .1) +
-  geom_label(aes(label = round(value, 3),
-                 color = best_model), x = 1, y = .2, 
-            data = md_abs_error_all_models, 
-            hjust = 0) +
-  guides(color=FALSE) +
-  theme_classic() +
-  labs(x = "ID of electorial district",
-       y = "(absolute) prediction error")
-  scale_color_manual(values = c("red", "darkgreen"))
-  
-p_model_error_md_iqr
-
-ggsave(filename = "../img/model-error-comp.pdf")
-```
-
-
-
-
-
-
-# Plotting prediction error against observed values
-
-
-```{r p-obs-est-err-values, out.width="100%"}
-posterior_per_person_best_model <- link(models[["m4a"]])
-  
-posterior_per_person_best_model %>%  
-  as_tibble() %>% 
-    summarise_all(median) %>% 
-    gather() %>% 
-    rename(estimate = value) %>% 
-  add_column(area_nr = 1:nrow(.)) %>% 
-  full_join(d79) %>%
-  mutate(error = abs(estimate - afd_prop),
-         top05 = percent_rank(error) >= .95) -> d_short_w_pred_err 
-
-
-polygon_pos <- data.frame(
-  x = c(0, 0.4, 0.4,    0, 0.4, 0, 0 ),
-  y = c(0, 0, 0.4,      0, 0.4, 0.4, 0),
-  value = c("underestimates", "underestimates", "underestimates", "overestimates", "overestimates", "overestimates", "overestimates")
-)
- 
-p_d_short_w_pred_err <- d_short_w_pred_err %>%  
-  ggplot() +
-  aes(x = afd_prop, y = estimate) +
-  geom_abline(slope = 1, intercept = 0, color = "grey60") +
-  geom_polygon(data = polygon_pos, aes(x = x, y = y, fill = value), alpha = .1) +
-  geom_point(aes(color = error,
-                 shape = east),
-             alpha = .6,
-             size = 2) +
-  ggrepel::geom_label_repel(aes(label = area_name), data = filter(d_short_w_pred_err, top05 == TRUE)) +
-  annotate("text", x = 0.4, y = 0, label = "model understimates", hjust = 1, vjust = 0) +
-  annotate("text", x = 0, y = 0.4, label = "model overestimates", hjust = 0, vjust = 1) +
-  labs(x = "Observed AfD votes (proportion)",
-       y = "Estimated AfD votes (proportion)",
-       caption = "n=79 electoral districts; data provided by Bundeswahlleiter 2017") +
-  guides(fill = FALSE) +
-  theme_classic()
-
-p_d_short_w_pred_err
-
-
-ggsave("../img/modelest-vs-obs.pdf", width = 10, height = 5)
-
-```
-
-
-
-
-
-
-# Check posterior distribution of predictors
-
-Let's have a look at the posterior distribution of the `best_model`.
-
-```{r}
-post_best_model <- extract.samples(models[[best_model_name]])
-```
-
-
-This object is a list. Let's convert it to a data frame for easier plotting.
-
-```{r}
-post_best_model_df <- tibble(
-  sigma = post_best_model[["sigma"]],
-  sigma2 = post_best_model[["sigma2"]],
-  beta1 = post_best_model[["beta1"]],
-  beta2= post_best_model[["beta2"]]
-)
-```
-
-And now we plot a number of histograms:
-
-```{r}
-post_best_model_df %>% 
-  gather() %>%  
-  rename(coef = key) %>% 
-  ggplot() +
-  aes(x = value) +
-  facet_wrap(~coef, scales = "free") +
-  theme_classic() + 
-  geom_histogram() -> p_post_best_model
-p_post_best_model
-```
-
-
-Now compute summary statistics:
-
-```{r}
-post_best_model_df %>% 
-  gather() %>% 
-  rename(coef = key) %>% 
-  group_by(coef) %>% 
-  summarise(q05 = quantile(value, .05),
-            q50 = quantile(value, .5),
-            q95 = quantile(value, .95),
-            value = mean(value)
-  )  -> post_best_model_df_sum
-  #gather(key = my_quantile, value = value, -coef) -> post_best_model_df_sum
-
-head(post_best_model_df_sum)
-```
-
-
-Now plot both:
-
-```{r}
-p_post_best_model +
-  geom_rect(data = post_best_model_df_sum,
-              aes(xmin = q05,
-                  xmax = q95,
-                  ymin = 0,
-                  ymax = Inf),
-            fill = "red",
-            alpha = .2) +
-  theme(axis.text.y=element_blank(),
-        axis.ticks.y = element_blank()) +
-  theme_classic() + 
-  labs(title = best_model_name,
-       y = "",
-       caption = "Note. Shaded areas demark 90% mass intervals")
-
-ggsave("../img/p-post-best-model.pdf")
-```
-
-
-
-
-
-
-
-
-# Geo plotting
-
-
-AfD success in the election:
-
-
-```{r afd-geoplot}
-wahlkreise_shp %>% 
-  left_join(select(d, area_nr, afd_prop), by = c("WKR_NR" = "area_nr")) %>% 
-  ggplot() +
-  geom_sf(aes(fill = afd_prop)) +
-  theme_void() +
-  scale_fill_viridis() +
-  labs(fill="Afd votes\n(Zweitstimme)",
-       caption = "Data provided by the Bundeswahlleiter 2017") -> p_afd
-p_afd
-
-# ggsave("img/p-afd.pdf")
-```
-
-
-Unemployment rates in Germany per district:
-
-
-```{r unemp-geoplot}
-wahlkreise_shp %>% 
-  left_join(select(d, area_nr, unemp_n, total_n), by = c("WKR_NR" = "area_nr")) %>% 
-  mutate(unemp_prop = unemp_n / total_n) %>% 
-  ggplot() +
-  geom_sf(aes(fill = unemp_prop)) + 
-  theme_void() +
-  scale_fill_viridis() +
-  labs(fill="unemployment rate",
-       caption = "Data provided by the Bundeswahlleiter 2017") -> p_unemp
-p_unemp
-
-# ggsave("img/p-unemp.pdf")
-```
-
-
-Foreigner rates:
-
-```{r for-geoplot}
-wahlkreise_shp %>% 
-  left_join(select(d, area_nr, for_prop, total_n), by = c("WKR_NR" = "area_nr")) %>% 
-  ggplot() +
-  geom_sf(aes(fill = for_prop)) + 
-  theme_void() +
-  scale_fill_viridis() +
-  labs(fill="Foreigner rate",
-       caption = "Data provided by the Bundeswahlleiter 2017") -> p_foreign
-
-p_foreign
-
-# ggsave("img/p-foreigners.pdf")
-```
-
-
-Joint diagrams
-
-```{r}
-library(gridExtra)
-
-grid.arrange(p_unemp, p_afd, nrow = 1)
-grid.arrange(p_foreign, p_afd, nrow = 1)
-```
-
-
-
-
-
-## Plot prediction errors
-
-
-
-```{r pred-error-geoplot}
-wahlkreise_shp %>% 
-  left_join(select(d79, area_nr, afd_prop), by = c("WKR_NR" = "area_nr")) %>% 
-  #drop_na(afd_prop) %>% 
-  ggplot() +
-  geom_sf(aes(fill = afd_prop)) + 
-  theme_void() +
-  scale_fill_viridis() +
-  labs(fill="Foreigner rate",
-       caption = "Data provided by the Bundeswahlleiter 2017") -> p_pred_error
-
-p_pred_error
-
-# ggsave("img/p-foreigners.pdf")
-```
-
-
-
-
-
-
-
-
-
-
-
-# Check linearity assumption
-
-
-
-Let's compute the predictions for each model:
-
-
-
-```{r fun-comp-preds}
-
-model_predictions <- lapply(models79, link)
- 
-```
-
-
-Now plot the predictions against the error, as advised by Gelman and Hill.
-
-First, get predictions of the best moel:
-
-```{r}
-model_predictions[[best_model_name]] %>% 
-  as_tibble %>% 
-  summarise_all(mean) %>% 
-  gather() -> best_model_preds
-
-```
-
-Each observation is one *row*  in this data frame.
-
-Similarly, get errors of the best model:
-
-
-```{r}
-model_error[[best_model_name]] %>% 
-  as_tibble() %>% 
-  rename(error = value) %>% 
-  mutate(pred = best_model_preds$value) -> best_model_pred_err
-  
-p_best_model_pred_err <- best_model_pred_err %>% 
-  ggplot() +
-  aes(x = pred, y = error) +
-  geom_hline(yintercept = quantile(best_model_pred_err$error, .5),
-             color = "grey60") +
-  geom_hline(yintercept = quantile(best_model_pred_err$error, .975),
-             color = "grey80", , linetype = "dashed") +
-  geom_hline(yintercept = quantile(best_model_pred_err$error, .025),
-             color = "grey80", , linetype = "dashed") +
-  geom_point() +
-  theme_classic() +
-  labs(title = best_model_name,
-       xlab = "Model predictions",
-       ylab = "Model error",
-       caption = "Note. Horizontal lines denote .025, .5, and .975 quantiles, respectively") 
-
-best_model_pred_err 
-
- 
-ggsave("../img/best-model-pred-err.pdf")
-```
-
-
-
-
-
-
-
-
-
 
 
 # Save results
@@ -1349,33 +701,12 @@ ggsave("../img/best-model-pred-err.pdf")
 save(models, 
      file = "../objects/models.Rda")
 
-save(compare_null_models,
-     file = "../objects/compare_null_models.Rda")
-
-save(compare_reduced_sample,
-     file = "../objects/compare_reduced_sample.Rda")
-
-save(model_error, 
-     file = "../objects/model_error.Rda")
-
-save(modell_error_IQR, 
-     file = "../objects/modell_error_IQR.Rda")
-
-
-save(model_error_df, 
-     file = "../objects/model_error_df.RDa")
-
-save(model_error_IQR_df, 
-     file = "../objects/model_error_IQR_df.RDa")
-
-
-save(model_error_md_iqr, 
-     file = "../objects/model_error_md_iqr.RDa")
-
-
-save(best_model_preds, 
-     file = "../objects/best_model_preds.Rda")
-
-
+write.csv(d79,
+          file = "../objects/d79.csv")
 ```
+
+
+
+
+
 

@@ -49,7 +49,7 @@ library(rethinking)  # Bayes modeling
 
 
 ```{r}
-d <- read_csv("objects/d_joined_values.csv")
+d <- read_csv("../objects/d_joined_values.csv")
 ```
 
 
@@ -67,7 +67,7 @@ value_types <- c("Genieser", "Harmoniesuchende", "Hedonisten",
 Rename all seven types:
 
 ```{r}
-d_renamed <- d %>% 
+d <- d %>% 
   rename(enjoyer = Genieser,
          harmony_seeker = Harmoniesuchende,
          hedonist = Hedonisten,
@@ -75,6 +75,9 @@ d_renamed <- d %>%
          appreciater = Werschätzenden,
          conformist = Konformisten,
          responsibility_denier = Verantwortungsverweiterer)
+
+attr(d, "renamed") <- TRUE
+
 ```
 
 
@@ -91,34 +94,20 @@ consumer_types <- c("enjoyer", "harmony_seeker",
 
 
 
-# z-standardize
-
-
-```{r d-short-z}
-d_renamed %>% 
-  sjmisc::std() %>%  
-  select(-c(state_z, area_nr_z, area_name_z, 
-            state_id_z, east_z, east_num_z, 
-            paste0(consumer_types, "_z"))) -> d_short_z
-
-names(d_short_z)
-```
-
-
 
 # Check distribution of afd_prop (outcome)
 
 ## afd_prop raw
 
 ```{r results = "hold"}
-gf_dens(~afd_prop, data = d_short_z)
-gf_qqline(~afd_prop, data = d_short_z) %>% 
+gf_dens(~afd_prop, data = d)
+gf_qqline(~afd_prop, data = d) %>% 
   gf_qq(~afd_prop)
 ```
 
 ```{r}
-skewness(d_short_z$afd_prop)
-kurtosis(d_short_z$afd_prop)
+skewness(d$afd_prop)
+kurtosis(d$afd_prop)
 ```
 
 
@@ -127,23 +116,23 @@ That's not normally distributed. Let's try to normalize it:
 
 ## afd_prop log
 
-```{r results = "hold"}
-gf_dens(~log(afd_prop), data = d_short_z)
-gf_qqline(~log(afd_prop), data = d_short_z) %>% 
-  gf_qq(~log(afd_prop), data = d_short_z)
+```{r p-log, results = "hold"}
+gf_dens(~log(afd_prop), data = d)
+gf_qqline(~log(afd_prop), data = d) %>% 
+  gf_qq(~log(afd_prop), data = d)
 ```
 
 ```{r}
-skewness(log(d_short_z$afd_prop))
-kurtosis(log(d_short_z$afd_prop))
+skewness(log(d$afd_prop))
+kurtosis(log(d$afd_prop))
 ```
 
 Skewness is good; kurtosis is good, since the kurtosis of the normal distribution is 3!
 
 Let's add this variable to thes datafrae:
 
-```{r}
-d_short_z <- d_short_z %>% 
+```{r mutate-log}
+d <- d %>% 
   mutate(afd_prop_log = log(afd_prop))
 ```
 
@@ -152,17 +141,17 @@ d_short_z <- d_short_z %>%
 ## afd_prop sqrt
 
 ```{r results = "hold"}
-gf_dens(~sqrt(afd_prop), data = d_short_z)
-gf_qqline(~sqrt(afd_prop), data = d_short_z) %>% 
-  gf_qq(~sqrt(afd_prop), data = d_short_z)
+gf_dens(~sqrt(afd_prop), data = d)
+gf_qqline(~sqrt(afd_prop), data = d) %>% 
+  gf_qq(~sqrt(afd_prop), data = d)
 ```
 
 
 ## afd_prop $x^-1$
 
 ```{r}
-gf_dens(~(afd_prop^-1), data = d_short_z)
-gf_qqline(~(afd_prop^-1), data = d_short_z) %>% 
+gf_dens(~(afd_prop^-1), data = d)
+gf_qqline(~(afd_prop^-1), data = d) %>% 
   gf_qq(~(afd_prop^-1))
 
 ```
@@ -171,20 +160,65 @@ gf_qqline(~(afd_prop^-1), data = d_short_z) %>%
 ## afd_prop $x^-2$
 
 ```{r}
-gf_dens(~(afd_prop^-2), data = d_short_z)
-gf_qqline(~(afd_prop^-2), data = d_short_z) %>% 
+gf_dens(~(afd_prop^-2), data = d)
+gf_qqline(~(afd_prop^-2), data = d) %>% 
   gf_qq(~(afd_prop^-2))
 
 ```
 
 
 
+
+# z-standardize
+
+
+```{r d-short-z}
+d %>% 
+  sjmisc::std() %>%  
+  select(-c(state_z, area_nr_z, area_name_z, 
+            state_id_z, east_z, east_num_z, 
+            paste0(consumer_types, "_z"))) -> d
+
+attr(d, "z-standardized") <- TRUE
+
+names(d)
+```
+
+
+# Check distrib of z-values
+
+
+```{r}
+d %>% 
+  gf_dens(~afd_prop_log_z)
+
+gf_qqline(~ afd_prop_log_z, data = d) %>% 
+  gf_qq(~ afd_prop_log_z)
+```
+
+
+
+
+```{r}
+skewness(d$afd_prop_log_z)
+kurtosis(d$afd_prop_log_z)
+```
+
+That's fine!
+
+
 # Save data
 
 
 ```{r}
-write_csv(d_short_z,
-          path = "objects/d_prepared.csv")
+write_csv(d,
+          path = "../objects/d_prepared.csv")
 ```
 
+
+# sessionInfo
+
+```{r}
+sessionInfo()
+```
 

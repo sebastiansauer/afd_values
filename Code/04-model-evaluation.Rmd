@@ -1,0 +1,856 @@
+---
+title: "Model evaluation"
+author: "Ich"
+date: "3/9/2019"
+output: html_document
+params:
+  readonly: FALSE
+editor_options: 
+  chunk_output_type: console
+---
+
+
+
+```{r knitr-setup}
+knitr::opts_chunk$set(
+  comment = "#>",
+  collapse = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  cache = TRUE,
+  out.width = "70%",
+  fig.align = 'center',
+  fig.width = 6,
+  fig.asp =  0.4,  #0.618,  # 1 / phi
+  fig.show = "hold",
+  size = "tiny"
+)
+
+```
+
+
+
+# Load packages
+
+
+```{r}
+library(sjmisc)
+library(viridis)
+library(pradadata)  # elec data
+library(tidyverse)
+library(knitr)
+library(tidylog)
+library(gghighlight)
+
+
+
+library(rethinking)  # Bayes modeling
+library("rstanarm")
+```
+
+
+
+# Data
+
+## Load data
+
+
+```{r}
+load("../objects/models.Rda")
+
+d79 <- read.csv("../objects/d79.csv")
+```
+
+
+
+# Change options
+
+
+```{r}
+options(ggplot2.continuous.colour="viridis")
+options(ggplot2.continuous.fill = "viridis")
+
+scale_colour_discrete <- scale_colour_viridis_d
+scale_fill_discrete <- scale_fill_viridis_d
+
+}
+```
+
+
+
+
+## Check model object
+
+```{r}
+names(models)
+```
+
+
+# Model comparison
+
+## Compare null models:
+
+```{r}
+compare_null_models <- compare( models[["m0a"]], models[["m0b"]])
+compare_null_models
+```
+
+
+## Compare models of reduced sample size
+
+
+### Define model vector
+
+
+
+Here are only the Cauchy models:
+
+
+
+```{r}
+
+models79 <- models[c("m0b",
+                     "m1b",
+                     "m2b",
+                     "m3b",
+                     "m4b")]
+
+length(models79)
+
+names(models79)
+names(models)
+
+model_names <- names(models79)
+
+```
+
+
+### Compare the models 
+
+
+Only models with Cauchy Sigmas:
+
+```{r}
+compare_reduced_sample <- compare(models[["m0b"]],
+                                  models[["m1b"]],
+                                  models[["m2b"]],
+                                  models[["m3b"]],
+                                  models[["m4b"]])
+compare_reduced_sample
+
+```
+
+
+
+# Best model
+
+
+## Get best model 
+
+Which model ist best? Let's define the model with the lowest WAIC as best:
+
+```{r}
+compare_reduced_sample@output %>% 
+  rownames_to_column(var = "model_name") %>%  
+  slice(which.min(WAIC)) -> best_model
+
+best_model
+```
+
+
+And now extract the *name* of the best model:
+
+```{r}
+best_model_name <-
+  best_model %>%
+  pull(model_name)
+
+best_model_name
+
+if (best_model_name == 'models[[\"m4a\"]]') best_model_name = "m4a"
+if (best_model_name == 'models[[\"m4b\"]]') best_model_name = "m4b"
+
+best_model_name
+```
+
+
+
+
+## Describe best model
+
+```{r}
+precis(models[[best_model_name]], depth = 2) 
+```
+
+
+
+## State names 
+
+Wait, what's the state names associated to the betas?
+
+
+
+```{r}
+d79 %>% 
+  distinct(state)
+```
+
+Hm, is this really the right order?
+
+What about this one?
+
+```{r}
+levels(factor(d79$state))
+```
+
+I assume this one makes more sense.
+
+
+
+
+# Computing prediction errors
+
+
+
+## Helper function
+
+Here's a function to compute the modeling error, defined as the absolute difference of the estimated model value (of afd proportion) minus the observed value (of afd proportion).
+
+
+```{r fun-comp-err}
+comp_abs_error <- function(model, data, fun = mean) {
+  posterior_per_person <- link(model)
+  
+  
+  as_tibble(posterior_per_person) %>% 
+    summarise_all(fun) %>% 
+    gather() %>% 
+    rename(estimate = value) %>% 
+    mutate(afd_prop_log_z = data$afd_prop_log_z,
+           error = abs(estimate - afd_prop_log_z)) %>% 
+    pull(error) -> error_vec
+  
+  return(error_vec)
+}
+
+```
+
+
+
+
+
+Apply the function on all models:
+
+```{r comp-all-model-errors, results = "hide"}
+model_error <- map(models79, comp_abs_error, data = d79)
+
+names(model_error) <- names(models79)
+```
+
+
+## Plot the distribution of absolute MEAN errors per model
+
+```{r}
+model_error_long <- model_error %>% 
+  as_tibble() %>% 
+  gather(key = model, value = abs_error) %>% 
+  mutate(is_best_model = ifelse(model == best_model_name, 
+                                TRUE, 
+                                FALSE)) 
+
+model_error_long %>% 
+  ggplot(aes(x = abs_error)) +
+  facet_grid(. ~ model) +
+  geom_density(aes(fill = is_best_model)) +
+  labs(title = "Distribution of absolute prediction error per model",
+       caption = "Note. Target variable is log. of AfD proportion (z-standardized)")
+
+
+model_error_long %>% 
+  ggplot(aes(x = model, y= abs_error)) +
+  geom_boxplot(aes(fill = is_best_model))  +
+  labs(title = "Distribution of absolute prediction error per model",
+       caption = "Note. Target variable is log. of AfD proportion (z-standardized)")
+  
+```
+
+
+
+## Mean error of best model
+
+Add the MEAN error of THE BEST MODEL to the data frame:
+
+```{r}
+d79 <- d79 %>% 
+  mutate(err_avg = model_error[[best_model_name]])
+```
+
+
+Let's look at the distribution:
+
+```{r}
+d79 %>% 
+  ggplot(aes(x = err_avg, y = ..density..)) +
+  geom_histogram() +
+  geom_density()  +
+  labs(title = "Distribution of absolute prediction error of best performing model",
+       caption = "Note. Target variable is log. of AfD proportion (z-standardized)")
+```
+
+
+
+## Abolute error per model
+
+Compute the median absolute error:
+
+
+```{r md-abs-err, results = "hide"}
+md_abs_error_all_models <- map_dbl(model_error, median)
+md_abs_error_all_models
+```
+
+The median absolute errors show the averaged absolute error (as per median) of for each predicted case.
+
+
+
+Compute the *mean* absolute error:
+
+
+```{r md-abs-err, results = "hide"}
+mean_abs_error_all_models <- map_dbl(model_error, mean) 
+mean_abs_error_all_models
+```
+
+The median absolute errors show the averaged absolute error (as per median) of for each predicted case.
+
+
+
+Also, compute the IQR of the errors:
+
+```{r iqr-abs-err, results = "hide"}
+modell_error_IQR <- lapply(models79, comp_error, fun = IQR, data = d79)
+
+md_of_model_iqr_error <- sapply(modell_error_IQR, median) %>% unlist()
+```
+
+
+
+
+# Average prediction
+
+## Compute average prediction
+
+
+
+```{r fun-comp-avg-pred}
+comp_avg_pred <- function(model, data, fun = mean) {
+  
+  posterior_per_person <- link(model)
+  
+  
+  as_tibble(posterior_per_person) %>% 
+    summarise_all(fun) %>% 
+    gather() %>% 
+    rename(estimate = value) %>% 
+    pull(estimate) -> predictions_vec
+  
+  return(predictions_vec)
+}
+
+```
+
+
+Apply the function on all models:
+
+```{r comp-all-model-avg-preds, results = "hide"}
+model_avg_predictions <- lapply(models79, comp_avg_pred, data = d79)
+
+names(model_avg_predictions) <- names(models79)
+```
+
+
+## Mean prediction of best model
+
+Add the MEAN error of THE BEST MODEL to the data frame:
+
+```{r}
+d79 <- d79 %>% 
+  mutate(pred_avg = model_avg_predictions[[best_model_name]])
+```
+
+
+
+
+
+
+## R squared of best model
+
+Attention this is the uncorrected overfitting prone R squared. 
+Note ther's also no information about variability (ie, only point estimate).
+
+
+```{r}
+r2_bestmodel <- 1 - var(d79$err_avg) / var(d79$afd_prop_log_z)
+r2_bestmodel
+```
+
+
+
+
+# Visualizing prediction error
+
+Some preparation:
+
+```{r prepare-error-data}
+model_error %>% 
+    as.data.frame() -> model_error_df
+
+
+names(model_error_df) <- names(models79)
+
+model_error_df %>% 
+  mutate(afd_prop_log_z = d79$afd_prop_log_z,
+         id = 1:nrow(model_error_df)) -> model_error_df
+
+
+modell_error_IQR %>% 
+  as.data.frame() -> model_error_IQR_df
+
+
+names(model_error_IQR_df) <- names(models79)
+
+model_error_IQR_df %>% 
+  mutate(id = 1:nrow(model_error_IQR_df)) -> model_error_IQR_df
+
+```
+
+
+
+Convert to long version for plotting:
+
+```{r convert-error-data}
+model_error_IQR_df %>% 
+  gather(key = model, value = iqr, -c(id)) %>% 
+  mutate(stat = "IQR") -> model_error_IQR_df_long
+
+
+model_error_df %>% 
+  gather(key = model, value = error, -c(afd_prop, id)) %>% 
+  mutate(stat = "median") -> model_error_df_long
+
+model_error_df_long %>% 
+  bind_rows(model_error_IQR_df_long) -> model_error_long
+
+
+model_error_df_long %>% 
+  left_join(model_error_IQR_df_long, by = c("id", "model")) %>% 
+  select(-c(stat.x, stat.y)) -> model_error_md_iqr
+
+glimpse(model_error_md_iqr)
+
+```
+
+
+Now plot:
+
+```{r plot-model-error, out.width = "100%"}
+
+
+as_tibble(md_abs_error_all_models) %>% 
+  mutate(model = model_names,
+         best_model = ifelse(model_names == best_model_name, TRUE, FALSE)) -> md_abs_error_all_models
+
+glimpse(md_abs_error_all_models)
+
+p_model_error_md_iqr <- model_error_md_iqr %>% 
+  arrange(-error) %>% 
+  ggplot(aes(x = id)) +
+  facet_wrap(~model) +
+  geom_hline(aes(yintercept = value,
+                 color = best_model), 
+             size = 3,
+             data = md_abs_error_all_models
+             ) +
+  geom_errorbar(aes(ymin = error - (iqr/2),
+                    ymax = error + (iqr/2)),
+                alpha = .3,
+                color = "gray40") +
+  geom_point(aes(y = error), alpha = .1) +
+  geom_label(aes(label = round(value, 3)), x = 1, y = .2, 
+            data = md_abs_error_all_models, 
+            hjust = 0) +
+  guides(color=FALSE) +
+  theme_classic() +
+  labs(x = "ID of electorial district",
+       y = "(absolute) prediction error") 
+  
+p_model_error_md_iqr
+
+ggsave(filename = "../img/model-error-comp.pdf")
+```
+
+
+
+
+
+
+# Plotting prediction error against observed values
+
+
+```{r p-obs-est-err-values, out.width="100%"}
+posterior_per_person_best_model <- link(models[[best_model_name]])
+  
+posterior_per_person_best_model %>%  
+  as_tibble() %>% 
+    summarise_all(median) %>% 
+    gather() %>% 
+    rename(estimate = value) %>% 
+  add_column(area_nr = 1:nrow(.)) %>% 
+  full_join(d79) %>%
+  mutate(error = abs(estimate - afd_prop_log_z),
+         top05 = percent_rank(error) >= .95) %>% 
+  drop_na(estimate) -> d_short_w_pred_err 
+
+dim(d_short_w_pred_err)
+
+
+polygon_pos <- data.frame(
+  x = c(-2, 2, 2,    -2, 2, -2, -2 ),
+  y = c(-2, -2, 2,      -2, 2, 2, -2),
+  value = c("underestimates", "underestimates", "underestimates", "overestimates", "overestimates", "overestimates", "overestimates")
+)
+ 
+p_d_short_w_pred_err <- d_short_w_pred_err %>%  
+  ggplot() +
+  aes(x = afd_prop_log_z, y = estimate) +
+  geom_abline(slope = 1, intercept = 0, color = "grey60") +
+  geom_polygon(data = polygon_pos, aes(x = x, y = y, fill = value), alpha = .1) +
+  geom_point(aes(color = error,
+                 shape = east),
+             alpha = .6,
+             size = 2) +
+  ggrepel::geom_label_repel(aes(label = area_name), data = filter(d_short_w_pred_err, top05 == TRUE)) +
+  annotate("text", x = Inf, y = -Inf, label = "model understimates", hjust = 1, vjust = 0) +
+  annotate("text", x = -Inf, y = Inf, label = "model overestimates", hjust = 0, vjust = 1) +
+  labs(x = "Log. of observed AfD votes (z-standardized)",
+       y = "Log. of estimated AfD votes (standardized)",
+       title = "Modelled vs. observed AFD votes. Top 5 percent predicted errors are labelled",
+       caption = "n=79 electoral districts; data provided by Bundeswahlleiter 2017") +
+  guides(fill = FALSE) +
+  theme_classic()
+
+p_d_short_w_pred_err
+
+
+ggsave("../img/modelest-vs-obs.pdf", width = 10, height = 5)
+
+```
+
+
+
+
+
+
+# Check posterior distribution of predictors
+
+Let's have a look at the posterior distribution of the `best_model`.
+
+```{r}
+post_best_model <- extract.samples(models[[best_model_name]])
+```
+
+
+This object is a list. Let's convert it to a data frame for easier plotting.
+
+```{r}
+post_best_model_df <- tibble(
+  sigma = post_best_model[["sigma"]],
+  sigma2 = post_best_model[["sigma2"]],
+  beta1 = post_best_model[["beta1"]],
+  beta2= post_best_model[["beta2"]]
+)
+```
+
+And now we plot a number of histograms:
+
+```{r}
+post_best_model_df <- post_best_model_df %>% 
+  gather() %>%  
+  rename(coef = key) %>% 
+  mutate(coef = factor(coef, labels = c("beta1: foreigners rate", 
+                                        "beta2: unemployment rate",
+                                        "sigma: sd of outcome variable prior",
+                                        "sigma2: sd of fedederal state prior")))
+  
+  
+post_best_model_df %>% 
+  ggplot() +
+  aes(x = value) +
+  facet_wrap(~coef, scales = "free") +
+  theme_classic() + 
+  geom_histogram() -> p_post_best_model
+
+p_post_best_model
+```
+
+
+Now compute summary statistics:
+
+```{r}
+post_best_model_df %>% 
+  group_by(coef) %>% 
+  summarise(q05 = quantile(value, .05),
+            q50 = quantile(value, .5),
+            q95 = quantile(value, .95),
+            value = mean(value)
+  )  -> post_best_model_df_sum
+  #gather(key = my_quantile, value = value, -coef) -> post_best_model_df_sum
+
+head(post_best_model_df_sum)
+```
+
+
+Now plot both:
+
+```{r}
+p_post_best_model +
+  geom_rect(data = post_best_model_df_sum,
+              aes(xmin = q05,
+                  xmax = q95,
+                  ymin = 0,
+                  ymax = Inf),
+            fill = "red",
+            alpha = .2) +
+  theme(axis.text.y=element_blank(),
+        axis.ticks.y = element_blank()) +
+  theme_classic() + 
+  labs(
+       y = "",
+       caption = "Note. Shaded areas demark 90% mass intervals")
+
+ggsave("../img/p-post-best-model.pdf")
+```
+
+
+
+
+
+
+
+
+# Geo plotting
+
+
+AfD success in the election:
+
+
+```{r afd-geoplot}
+wahlkreise_shp %>% 
+  left_join(select(d, area_nr, afd_prop), by = c("WKR_NR" = "area_nr")) %>% 
+  ggplot() +
+  geom_sf(aes(fill = afd_prop)) +
+  theme_void() +
+  scale_fill_viridis() +
+  labs(fill="Afd votes\n(Zweitstimme)",
+       caption = "Data provided by the Bundeswahlleiter 2017") -> p_afd
+p_afd
+
+# ggsave("img/p-afd.pdf")
+```
+
+
+Unemployment rates in Germany per district:
+
+
+```{r unemp-geoplot}
+wahlkreise_shp %>% 
+  left_join(select(d, area_nr, unemp_n, total_n), by = c("WKR_NR" = "area_nr")) %>% 
+  mutate(unemp_prop = unemp_n / total_n) %>% 
+  ggplot() +
+  geom_sf(aes(fill = unemp_prop)) + 
+  theme_void() +
+  scale_fill_viridis() +
+  labs(fill="unemployment rate",
+       caption = "Data provided by the Bundeswahlleiter 2017") -> p_unemp
+p_unemp
+
+# ggsave("img/p-unemp.pdf")
+```
+
+
+Foreigner rates:
+
+```{r for-geoplot}
+wahlkreise_shp %>% 
+  left_join(select(d, area_nr, for_prop, total_n), by = c("WKR_NR" = "area_nr")) %>% 
+  ggplot() +
+  geom_sf(aes(fill = for_prop)) + 
+  theme_void() +
+  scale_fill_viridis() +
+  labs(fill="Foreigner rate",
+       caption = "Data provided by the Bundeswahlleiter 2017") -> p_foreign
+
+p_foreign
+
+# ggsave("img/p-foreigners.pdf")
+```
+
+
+Joint diagrams
+
+```{r}
+library(gridExtra)
+
+grid.arrange(p_unemp, p_afd, nrow = 1)
+grid.arrange(p_foreign, p_afd, nrow = 1)
+```
+
+
+
+
+
+## Plot prediction errors
+
+
+
+```{r pred-error-geoplot}
+wahlkreise_shp %>% 
+  left_join(select(d79, area_nr, err_avg), by = c("WKR_NR" = "area_nr")) %>% 
+  #drop_na(afd_prop) %>% 
+  ggplot() +
+  geom_sf(aes(fill = err_avg)) + 
+  theme_void() +
+  scale_fill_viridis() +
+  labs(title = "Average mean prediction errors of best model",
+       fill = "Average absolute \nprediction error",
+       caption = "Data provided by the Bundeswahlleiter 2017") -> p_pred_error
+
+p_pred_error
+
+ggsave("../img/p_pred_error.pdf")
+```
+
+
+
+
+
+
+
+
+
+
+
+# Check linearity assumption
+
+
+
+Let's compute the predictions for each model:
+
+
+
+```{r fun-comp-preds}
+
+model_predictions <- lapply(models79, link)
+ 
+```
+
+
+Now plot the predictions against the error, as advised by Gelman and Hill.
+
+First, get predictions of the best moel:
+
+```{r}
+model_predictions[[best_model_name]] %>% 
+  as_tibble %>% 
+  summarise_all(mean) %>% 
+  gather() -> best_model_preds
+
+```
+
+Each observation is one *row*  in this data frame.
+
+Similarly, get errors of the best model:
+
+
+```{r}
+model_error[[best_model_name]] %>% 
+  as_tibble() %>% 
+  rename(error = value) %>% 
+  mutate(pred = best_model_preds$value) -> best_model_pred_err
+  
+p_best_model_pred_err <- best_model_pred_err %>% 
+  ggplot() +
+  aes(x = pred, y = error) +
+  geom_hline(yintercept = quantile(best_model_pred_err$error, .5),
+             color = "grey60") +
+  geom_hline(yintercept = quantile(best_model_pred_err$error, .975),
+             color = "grey80", , linetype = "dashed") +
+  geom_hline(yintercept = quantile(best_model_pred_err$error, .025),
+             color = "grey80", , linetype = "dashed") +
+  geom_point() +
+  theme_classic() +
+  labs(title = best_model_name,
+       xlab = "Model predictions",
+       ylab = "Model error",
+       caption = "Note. Horizontal lines denote .025, .5, and .975 quantiles, respectively") 
+
+p_best_model_pred_err 
+
+ 
+ggsave("../img/p_best_model_pred_err.pdf")
+```
+
+
+
+
+
+
+
+
+
+
+
+# Save results
+
+
+```{r}
+save(models, 
+     file = "../objects/models.Rda")
+
+save(compare_null_models,
+     file = "../objects/compare_null_models.Rda")
+
+save(compare_reduced_sample,
+     file = "../objects/compare_reduced_sample.Rda")
+
+save(model_error, 
+     file = "../objects/model_error.Rda")
+
+save(modell_error_IQR, 
+     file = "../objects/modell_error_IQR.Rda")
+
+
+save(model_error_df, 
+     file = "../objects/model_error_df.RDa")
+
+save(model_error_IQR_df, 
+     file = "../objects/model_error_IQR_df.RDa")
+
+
+save(model_error_md_iqr, 
+     file = "../objects/model_error_md_iqr.RDa")
+
+
+save(best_model_preds, 
+     file = "../objects/best_model_preds.Rda")
+
+save(model_predictions,
+     file = "../objectsmodel_predictions.Rda")
+
+
+save(model_avg_predictions,
+     file = "../model_avg_predictions.Rda")
+
+
+```
+
