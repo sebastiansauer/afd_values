@@ -3,6 +3,8 @@ title: "Data modeling"
 author: "Ich"
 date: "3/9/2019"
 output: html_document
+params:
+  readonly: FALSE
 editor_options: 
   chunk_output_type: console
 ---
@@ -39,8 +41,10 @@ library(tidyverse)
 library(knitr)
 library(tidylog)
 
-library(rethinking)  # Bayes modeling
 
+
+library(rethinking)  # Bayes modeling
+library("rstanarm")
 ```
 
 
@@ -49,7 +53,7 @@ library(rethinking)  # Bayes modeling
 Raw data:
 
 ```{r}
-d <- read_csv("objects/d_prepared.csv")
+d <- read_csv("../objects/d_prepared.csv")
 d <- as.data.frame(d)
 ```
 
@@ -72,8 +76,24 @@ dim(d79)
 objects from models:
 
 ```{r}
-load("objects/models.Rda")
+if (params$readonly == TRUE) load("../objects/models.Rda")
 ```
+
+
+
+
+In addition, we will make use of geo data in order to geoplot the modeling results. The Bundeswahlleiter provides such data (again via `pradadata`):
+
+```{r data-shp}
+data("wahlkreise_shp")
+```
+
+
+
+
+
+
+
 
 
 # Helper stuff
@@ -645,6 +665,27 @@ models[["m4b"]] <- m4b
 
 
 
+### m4b_stan: STANARM variant
+
+
+
+```{r}
+
+m4b_stan <- stan_glmer(afd_prop ~ for_prop_z + unemp_prop_z +
+                                (1 |state_id), data = d79)
+
+
+summary(m4b_stan)
+
+rsq <- bayes_R2(m4b_stan)
+print(median(rsq))  
+
+prior_summary(object = m4b_stan)
+
+print(m4b_stan, digits = 2)
+```
+
+
 # Check model object
 
 ```{r}
@@ -699,7 +740,10 @@ compare_reduced_sample
 ```
 
 
-# Get best model (Gaussian)
+# Best model
+
+
+## Get best model 
 
 Which model ist best? Let's define the model with the lowest WAIC as best:
 
@@ -719,17 +763,55 @@ best_model_name <-
 best_model_name
 
 if (best_model_name == 'models[[\"m4a\"]]') best_model_name = "m4a"
+if (best_model_name == 'models[[\"m4b\"]]') best_model_name = "m4b"
 best_model_name
 ```
 
 
 
 
+## Describe best model
+
+```{r}
+precis(models[[best_model_name]], depth = 2)
+```
+
+
+Wait, what's the state names associated to the betas?
+
+
+
+```{r}
+d79 %>% 
+  distinct(state)
+```
+
+Hm, is this really the right order?
+
+What about this one?
+
+```{r}
+levels(factor(d79$state))
+```
+
+I assume this one makes more sense.
+
+
+
+## R-squared
+
+
+```{r}
+1 - var(resid(models[[best_model_name]])) / var(d79$afd_prop)
+```
 
 
 
 # Computing prediction errors
 
+
+
+## Helper function
 
 Here's a function to compute the modeling error, defined as the absolute difference of the estimated model value (of afd proportion) minus the observed value (of afd proportion).
 
@@ -762,6 +844,19 @@ names(model_error) <- names(models79)
 ```
 
 
+## Mean error of best model
+
+Add the MEAN error of THE BEST MODEL to the data frame:
+
+```{r}
+d79 <- d79 %>% 
+  mutate(err_avg = model_error[[best_model_name]])
+```
+
+
+
+## Median abolute error per model
+
 Compute the median absolute error:
 
 
@@ -771,6 +866,7 @@ md_abs_error_all_models
 
 ```
 
+The median absolute errors show the averaged absolute error (as per median) of for each predicted case.
 
 
 Also, compute the IQR of the errors:
@@ -782,6 +878,66 @@ modell_error_IQR
 
 
 
+
+# Average prediction
+
+## Compute average prediction
+
+
+
+```{r fun-comp-err}
+comp_avg_pred <- function(model, data, fun = mean) {
+  
+  posterior_per_person <- link(model)
+  
+  
+  as_tibble(posterior_per_person) %>% 
+    summarise_all(fun) %>% 
+    gather() %>% 
+    rename(estimate = value) %>% 
+    pull(estimate) -> predictions_vec
+  
+  return(predictions_vec)
+}
+
+```
+
+
+Apply the function on all models:
+
+```{r comp-all-model-errors, results = "hide"}
+model_avg_predictions <- lapply(models79, comp_avg_pred, data = d79)
+
+names(model_avg_predictions) <- names(models79)
+```
+
+
+## Mean predcition of best model
+
+Add the MEAN error of THE BEST MODEL to the data frame:
+
+```{r}
+d79 <- d79 %>% 
+  mutate(pred_avg = model_avg_predictions[[best_model_name]])
+```
+
+
+
+
+
+
+## R squared of best model
+
+Attention this is the uncorrected overfitting prone R squared.
+
+
+```{r}
+
+
+r2_bestmodel <- 1 - var(d79$err_avg) / var(d79$afd_prop)
+r2_bestmodel
+
+```
 
 
 
@@ -873,7 +1029,7 @@ p_model_error_md_iqr <- model_error_md_iqr %>%
   
 p_model_error_md_iqr
 
-ggsave(filename = "img/model-error-comp.pdf")
+ggsave(filename = "../img/model-error-comp.pdf")
 ```
 
 
@@ -925,7 +1081,7 @@ p_d_short_w_pred_err <- d_short_w_pred_err %>%
 p_d_short_w_pred_err
 
 
-ggsave("img/modelest-vs-obs.pdf", width = 10, height = 5)
+ggsave("../img/modelest-vs-obs.pdf", width = 10, height = 5)
 
 ```
 
@@ -1005,8 +1161,113 @@ p_post_best_model +
        y = "",
        caption = "Note. Shaded areas demark 90% mass intervals")
 
-ggsave("img/p-post-best-model.pdf")
+ggsave("../img/p-post-best-model.pdf")
 ```
+
+
+
+
+
+
+
+
+# Geo plotting
+
+
+AfD success in the election:
+
+
+```{r afd-geoplot}
+wahlkreise_shp %>% 
+  left_join(select(d, area_nr, afd_prop), by = c("WKR_NR" = "area_nr")) %>% 
+  ggplot() +
+  geom_sf(aes(fill = afd_prop)) +
+  theme_void() +
+  scale_fill_viridis() +
+  labs(fill="Afd votes\n(Zweitstimme)",
+       caption = "Data provided by the Bundeswahlleiter 2017") -> p_afd
+p_afd
+
+# ggsave("img/p-afd.pdf")
+```
+
+
+Unemployment rates in Germany per district:
+
+
+```{r unemp-geoplot}
+wahlkreise_shp %>% 
+  left_join(select(d, area_nr, unemp_n, total_n), by = c("WKR_NR" = "area_nr")) %>% 
+  mutate(unemp_prop = unemp_n / total_n) %>% 
+  ggplot() +
+  geom_sf(aes(fill = unemp_prop)) + 
+  theme_void() +
+  scale_fill_viridis() +
+  labs(fill="unemployment rate",
+       caption = "Data provided by the Bundeswahlleiter 2017") -> p_unemp
+p_unemp
+
+# ggsave("img/p-unemp.pdf")
+```
+
+
+Foreigner rates:
+
+```{r for-geoplot}
+wahlkreise_shp %>% 
+  left_join(select(d, area_nr, for_prop, total_n), by = c("WKR_NR" = "area_nr")) %>% 
+  ggplot() +
+  geom_sf(aes(fill = for_prop)) + 
+  theme_void() +
+  scale_fill_viridis() +
+  labs(fill="Foreigner rate",
+       caption = "Data provided by the Bundeswahlleiter 2017") -> p_foreign
+
+p_foreign
+
+# ggsave("img/p-foreigners.pdf")
+```
+
+
+Joint diagrams
+
+```{r}
+library(gridExtra)
+
+grid.arrange(p_unemp, p_afd, nrow = 1)
+grid.arrange(p_foreign, p_afd, nrow = 1)
+```
+
+
+
+
+
+## Plot prediction errors
+
+
+
+```{r pred-error-geoplot}
+wahlkreise_shp %>% 
+  left_join(select(d79, area_nr, afd_prop), by = c("WKR_NR" = "area_nr")) %>% 
+  #drop_na(afd_prop) %>% 
+  ggplot() +
+  geom_sf(aes(fill = afd_prop)) + 
+  theme_void() +
+  scale_fill_viridis() +
+  labs(fill="Foreigner rate",
+       caption = "Data provided by the Bundeswahlleiter 2017") -> p_pred_error
+
+p_pred_error
+
+# ggsave("img/p-foreigners.pdf")
+```
+
+
+
+
+
+
+
 
 
 
@@ -1068,7 +1329,7 @@ p_best_model_pred_err <- best_model_pred_err %>%
 best_model_pred_err 
 
  
-ggsave("best-model-pred-err.pdf")
+ggsave("../img/best-model-pred-err.pdf")
 ```
 
 
@@ -1086,34 +1347,34 @@ ggsave("best-model-pred-err.pdf")
 
 ```{r}
 save(models, 
-     file = "objects/models.Rda")
+     file = "../objects/models.Rda")
 
 save(compare_null_models,
-     file = "objects/compare_null_models.Rda")
+     file = "../objects/compare_null_models.Rda")
 
 save(compare_reduced_sample,
-     file = "objects/compare_reduced_sample.Rda")
+     file = "../objects/compare_reduced_sample.Rda")
 
 save(model_error, 
-     file = "objects/model_error.Rda")
+     file = "../objects/model_error.Rda")
 
 save(modell_error_IQR, 
-     file = "objects/modell_error_IQR.Rda")
+     file = "../objects/modell_error_IQR.Rda")
 
 
 save(model_error_df, 
-     file = "objects/model_error_df.RDa")
+     file = "../objects/model_error_df.RDa")
 
 save(model_error_IQR_df, 
-     file = "objects/model_error_IQR_df.RDa")
+     file = "../objects/model_error_IQR_df.RDa")
 
 
 save(model_error_md_iqr, 
-     file = "objects/model_error_md_iqr.RDa")
+     file = "../objects/model_error_md_iqr.RDa")
 
 
 save(best_model_preds, 
-     file = "objects/best_model_preds.Rda")
+     file = "../objects/best_model_preds.Rda")
 
 
 ```
