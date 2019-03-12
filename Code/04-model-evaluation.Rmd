@@ -55,10 +55,11 @@ library("rstanarm")
 ## Load data
 
 
-```{r}
+```{r load-data}
 load("../objects/models.Rda")
 
 d79 <- read.csv("../objects/d79.csv")
+d <- read_csv("../objects/d_prepared.csv")
 ```
 
 
@@ -66,14 +67,13 @@ d79 <- read.csv("../objects/d79.csv")
 # Change options
 
 
-```{r}
+```{rset-options}
 options(ggplot2.continuous.colour="viridis")
 options(ggplot2.continuous.fill = "viridis")
 
 scale_colour_discrete <- scale_colour_viridis_d
 scale_fill_discrete <- scale_fill_viridis_d
 
-}
 ```
 
 
@@ -90,7 +90,7 @@ names(models)
 
 ## Compare null models:
 
-```{r}
+```{r compare-null-models}
 compare_null_models <- compare( models[["m0a"]], models[["m0b"]])
 compare_null_models
 ```
@@ -242,7 +242,7 @@ comp_abs_error <- function(model, data, fun = mean) {
 Apply the function on all models:
 
 ```{r comp-all-model-errors, results = "hide"}
-model_error <- map(models79, comp_abs_error, data = d79)
+model_error <- purrr::map(models79, comp_abs_error, data = d79)
 
 names(model_error) <- names(models79)
 ```
@@ -250,7 +250,7 @@ names(model_error) <- names(models79)
 
 ## Plot the distribution of absolute MEAN errors per model
 
-```{r}
+```{r plot-err-distrib}
 model_error_long <- model_error %>% 
   as_tibble() %>% 
   gather(key = model, value = abs_error) %>% 
@@ -304,7 +304,7 @@ d79 %>%
 Compute the median absolute error:
 
 
-```{r md-abs-err, results = "hide"}
+```{r md-abs-err-md, results = "hide"}
 md_abs_error_all_models <- map_dbl(model_error, median)
 md_abs_error_all_models
 ```
@@ -316,7 +316,7 @@ The median absolute errors show the averaged absolute error (as per median) of f
 Compute the *mean* absolute error:
 
 
-```{r md-abs-err, results = "hide"}
+```{r md-abs-err-mean, results = "hide"}
 mean_abs_error_all_models <- map_dbl(model_error, mean) 
 mean_abs_error_all_models
 ```
@@ -328,7 +328,7 @@ The median absolute errors show the averaged absolute error (as per median) of f
 Also, compute the IQR of the errors:
 
 ```{r iqr-abs-err, results = "hide"}
-modell_error_IQR <- lapply(models79, comp_error, fun = IQR, data = d79)
+modell_error_IQR <- lapply(models79, comp_abs_error, fun = IQR, data = d79)
 
 md_of_model_iqr_error <- sapply(modell_error_IQR, median) %>% unlist()
 ```
@@ -435,7 +435,7 @@ model_error_IQR_df %>%
 
 
 model_error_df %>% 
-  gather(key = model, value = error, -c(afd_prop, id)) %>% 
+  gather(key = model, value = error, -c(afd_prop_log_z, id)) %>% 
   mutate(stat = "median") -> model_error_df_long
 
 model_error_df_long %>% 
