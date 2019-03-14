@@ -10,6 +10,8 @@ editor_options:
 ---
 
 
+# Setup
+
 
 ```{r knitr-setup}
 knitr::opts_chunk$set(
@@ -30,7 +32,7 @@ knitr::opts_chunk$set(
 
 
 
-# Load packages
+## Load packages
 
 
 ```{r}
@@ -39,10 +41,19 @@ library(viridis)
 library(pradadata)  # elec data
 library(tidyverse)
 library(knitr)
+library(sf)
 
 library(rethinking)  # Bayes modeling
-
+library(rprojroot)
 ```
+
+
+
+
+```{r}
+proj_root <- rprojroot::find_root(as.root_criterion(is_rstudio_project))
+```
+
 
 
 
@@ -56,7 +67,7 @@ Load zip data (PLZ):
 
 
 ```{r load-zip-data}
-zip <- readxl::read_excel("data_raw/Wahlkreise_PLZ.xlsx")
+zip <- readxl::read_excel(paste0(proj_root, "/data_raw/Wahlkreise_PLZ.xlsx"))
 ```
 
 
@@ -74,11 +85,11 @@ Copyright Notice:
           
 ## Values data
 
-Load values data:
+### Load values data
 
 
 ```{r load-values-data}
-load("data_raw/Choughs2017.Rdata")
+load(paste0(proj_root, "/data_raw/Choughs2017.Rdata"))
 values <- Choughs2017
 ```
 
@@ -87,6 +98,7 @@ The variable `fit.cluster` shows the seven different value types:
 ```{r}
 values$fit.cluster %>% unique()
 ```
+
 
 
 
@@ -128,11 +140,118 @@ Note: Data objects can also be downloaded [from this source](https://osf.io/2yhr
 
 
 
+# Checks
+
+
+
+
+
+## Check values data
+
+Do the long and lat values appear plausible?
+
+
+### Geo plot PLZ
+
+```{r}
+values %>% 
+  select(lon, lat) %>% 
+  gather( ) %>% 
+  ggplot() +
+  geom_jitter(aes(x = key, y = value), alpha = .7)
+```
+
+
+```{r}
+values <- values %>% 
+  filter(between(lon, 5, 15)) %>% 
+  filter(between(lat, 45, 60)) %>% 
+  drop_na(lon, lat)
+
+
+values_sf <- values %>% 
+  select(PLZ, lon, lat) %>% 
+  st_as_sf(coords = c("lon", "lat"), crs = 4236)
+
+values_sf
+
+values_coord <- st_coordinates(values_sf) %>%
+  cbind(values_sf)
+```
+
+
+
+```{r}
+wahlkreise_shp %>% 
+  ggplot() +
+  geom_sf() +
+  geom_point(data = values_coord,
+             aes(x = X, y = Y)) +
+    coord_sf(xlim = c(5, 15), ylim = c(45, 60))  
+
+
+```
+
+
+
+### Distriub of PLZ
+
+```{r}
+values %>% 
+  mutate(PLZ_num = parse_number(PLZ)) %>% 
+  ggplot(aes(x = PLZ_num)) +
+  geom_histogram()
+```
+
+
+How many cases for PLZ are missing?
+
+```{r}
+values %>% 
+  select(fit.cluster, PLZ ) %>% 
+  drop_na(PLZ) %>% 
+  nrow()
+```
+
+
+
+## Check ZIP data
+
+
+how many DIFFERENT PLZ values?
+
+```{r}
+unique(zip$PLZ) %>% length()
+```
+
+
+Ba-Wü?
+
+
+```{r}
+zip %>% 
+  filter(str_detect(Gemeinde, "Stuttg"))
+
+zip %>% 
+  filter(str_detect(PLZ, "^70"))
+```
+
+
+
+```{r}
+zip %>% 
+  filter(PLZ == "80639")
+```
+
+
 # Data joining
 
 
-Now let's merge the data frames. There will also be some janitor work such as renaming columns etc.
+Now let's merge t
 
+he data frames. There will also be some janitor work such as renaming columns etc.
+
+## Prep
 
 First, change the names of the `socec` data to a common format:
 
@@ -188,7 +307,7 @@ socec2 %>%
 ```
 
 
-# After-merge preparations
+## After-merge preparations
 
 
 
@@ -208,7 +327,7 @@ d_all_with_na$east_num <- ifelse(d_all_with_na$east == "yes", 1, 0)
 
 
 
-# Main data frame: d_short 
+## Main data frame: d_short 
 
 We will also provide a version without the geo data, and in pure (old school) `data frame` form (ie., not as tibble)_
 
@@ -277,22 +396,101 @@ if (params$verbose == TRUE) glimpse(d_short_nona_1000)
 
 ## Join main data with zip codes data
 
+
+PLZ in zip file
+
+```{r}
+zip <- zip %>% 
+  mutate(area_nr = parse_number(Nr)) %>% 
+  mutate(zip_4 = str_extract(PLZ, "\\d{4}"))
+```
+
+
+
+
+
+
+
 ```{r join-elec-with-zip}
 d_zip <- d_short_nona %>% 
-  left_join(zip, by = c("area_name" = "Wahlkreis_Name"))
+  left_join(zip, by = c("area_nr", "area_nr"))
 ```
+
+```{r}
+nrow(d_zip)
+nrow(d_zip2)
+```
+
+
+
+
 
 
 Note that a left join was performed.
 
+
+### Check
+
+
+```{r}
+d_zip %>% 
+  filter(is.na(PLZ))
+# no na
+```
+
+
+Check for Nordrfiesland
+
+
+```{r}
+
+```
+
+
+
 ## Join election data with values data
+
+
+VALUES PLZ with 4 digits only:
+
+
+```{r}
+values <- values %>% 
+  mutate(zip_4 = str_extract(PLZ, "\\d{4}"))
+```
+
+
+
 
 ```{r join-elec-with-values}
 
 d_joined <- d_zip %>% 
-  left_join(values, by = c("PLZ" = "PLZ"))
+  left_join(values, by= c("PLZ", "PLZ"))
+
+d_joined2 <- d_zip %>% 
+  left_join(values, by = c("zip_4", "zip_4"))
 ```
 
+Note the type of join
+
+### Check
+
+```{r}
+d_joined %>% 
+  drop_na(fit.cluster, PLZ) %>% 
+  nrow()
+```
+
+
+How many different areas?
+
+```{r}
+d_joined %>% 
+  summarise(n_distinct(area_nr))
+```
+
+
+thats'ok, 299 different areas. Go ahead.
 
 
 
@@ -322,27 +520,54 @@ count_wertetypen <- function(df){
     select(wertetyp, area_nr) %>% 
     # drop_na() %>% 
     count(wertetyp) %>% 
-    mutate(wertetyp_prop = n / sum(n)) %>% 
-    select(-n) %>% 
-    spread( key = wertetyp, value = wertetyp_prop) 
+    spread(key = wertetyp, value = n) 
 }
 ```
+
+
+
 
 This function computes the proportion for each consumer type per area (plus one proportion for NA for each area).
 
 ```{r}
 werte <- d_joined %>%
   group_split(area_nr) %>%  # group by Wahlkreis 
-  map_dfr(count_wertetypen) %>% 
-  add_id("area_nr")
+  map_dfr(count_wertetypen)  %>% 
+  add_id(var = "area_nr")
 ```
+
+
+Let's check the number of different areas.
+
+```{r}
+werte %>% 
+  summarise(n_distinct(area_nr))
+```
+
+
+```{r}
+werte %>% 
+  distinct(area_nr) %>% pull()
+```
+
+
 
 Now we join that to the n=299 data frame:
 
 ```{r}
 d_joined_values <- d_short_nona %>% 
-  full_join(werte) %>% 
-  rename(type_unknown = "<NA>")
+  full_join(werte, by = c("area_nr", "area_nr")) %>% 
+  rename(type_unknown = "<NA>") %>% 
+  mutate(n_wertetypen = Genieser + Harmoniesuchende + Hedonisten + 
+           Selbstbestimmte + Werschätzenden + Konformisten + 
+           Verantwortungsverweiterer)
+```
+
+
+```{r}
+d_joined_values %>% 
+  arrange(-n_wertetypen) %>% 
+  select(n_wertetypen, area_nr, area_name)
 ```
 
 
@@ -358,16 +583,31 @@ value_types <- c("Genieser", "Harmoniesuchende", "Hedonisten",
 ```
 
 
+
+
+
+
 ## For how many areas do we have consumer values?
+
 
 ```{r}
 d_joined_values %>% 
-  drop_na(one_of(value_types)) %>% nrow()
+  summarise(sum(n_wertetypen, na.rm = TRUE))
 ```
 
 
 
-Only 79, out of 299. That's a lot of data lost :-(.
+
+```{r}
+d_joined_values %>% 
+  drop_na(Genieser:Verantwortungsverweiterer) %>% nrow()
+```
+
+
+
+Only 81, out of 299. That's a lot of data lost :-(.
+
+
 
 
 
@@ -380,6 +620,16 @@ Number of rows in the 'values' dataset should approximate the row count in the v
 ```{r}
 nrow(values)/nrow(d_joined)
 ```
+
+
+## Check effective n
+
+```{r}
+d_joined_values %>% 
+  summarise(sum(n_wertetypen, na.rm = TRUE))
+```
+
+
 
 
 ## Number of missings per column

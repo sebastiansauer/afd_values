@@ -877,15 +877,114 @@ WAIC(m6b)
 
 
 
+### M7b:  8 consumer only
+
+
+
+
+```{r m7b}
+d_model <- d %>% 
+  select(one_of(c(consumer_types, standard_model_vars, "east"))) %>% 
+  drop_na() %>% 
+  as.data.frame()
+
+dim(d_model)
+
+m7b <- map2stan(
+  alist(
+    afd_prop_log_z ~ dnorm(mu, sigma),
+    mu <- beta3*enjoyer + beta4*harmony_seeker + beta5*self_determined +
+      beta6*appreciater + beta7*conformist + beta8*type_unknown +
+      beta9*responsibility_denier,
+
+    sigma ~ dcauchy(0, 1),
+
+    beta3 ~ dnorm(0, 1),   
+    beta4 ~ dnorm(0, 1),    
+    beta5 ~ dnorm(0, 1),    
+    beta6 ~ dnorm(0, 1),
+    beta7 ~ dnorm(0, 1),
+    beta8 ~ dnorm(0, 1),
+    beta9 ~ dnorm(0, 1)
+  ),
+  data = d_model,
+  chains = 2,
+  cores  = 2
+)
+```
+
+
+
+```{r out.width="100%"}
+precis(m7b, depth = 2)
+coeftab(m7b)
+my_traceplot(m7b)
+models[["m7b"]] <- m7b
+
+WAIC(m7b)
+```
+
+
+
+
+### M8b:  SEVEN consumer variables only, no NA-variable
+
+
+
+
+```{r m8b}
+d_model <- d %>% 
+  select(one_of(c(consumer_types, standard_model_vars, "east"))) %>% 
+  drop_na() %>% 
+  select(-type_unknown) %>% 
+  as.data.frame()
+
+dim(d_model)
+
+m8b <- map2stan(
+  alist(
+    afd_prop_log_z ~ dnorm(mu, sigma),
+    mu <- beta3*enjoyer + beta4*harmony_seeker + beta5*self_determined +
+      beta6*appreciater + beta7*conformist +
+      beta9*responsibility_denier,
+
+    sigma ~ dcauchy(0, 1),
+
+    beta3 ~ dnorm(0, 1),   
+    beta4 ~ dnorm(0, 1),    
+    beta5 ~ dnorm(0, 1),    
+    beta6 ~ dnorm(0, 1),
+    beta7 ~ dnorm(0, 1),
+    
+    beta9 ~ dnorm(0, 1)
+  ),
+  data = d_model,
+  chains = 2,
+  cores  = 2
+)
+```
+
+
+
+```{r out.width="100%"}
+precis(m8b, depth = 2)
+coeftab(m8b)
+my_traceplot(m8b)
+models[["m8b"]] <- m8b
+
+WAIC(m8b)
+```
+
+
 # Save results
 
 
 ```{r}
 save(models, 
-     file = "../objects/models.Rda")
+     file = paste0(proj_root, "/objects/models.Rda"))
 
 write.csv(d79,
-          file = "../objects/d79.csv")
+          file = paste0(proj_root, "/objects/d79.csv"))
 ```
 
 

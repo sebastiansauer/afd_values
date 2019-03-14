@@ -77,17 +77,11 @@ class: top, left
 # Causes of 20th century world wars
 
 
-- *nationalism*
+- Perceived in-group superiority (nationals, racism, antizionism)
 
-- authoritarianism
+- (Perceived) injustice and inequality
 
-- racism
-
-- territorial disputes
-
-- class conflicts
-
-- crisis of capitalism
+- Autocrats as political leaders
 
 
 .small[.footnote[Source: Kershaw, I. (2016). To hell and back: Europe 1914-1949. New York City, NW: Penguin.]]
@@ -108,6 +102,17 @@ class: top, left
 # Right-wing populism varies greatly, but...
 
 
+
+```{r out.width="80%"}
+my_file <- paste0(proj_root, "/img/audience-828584_1280.jpg")
+if (!file.exists(my_file)) warning ("File does not exist")
+knitr::include_graphics( "img/audience-828584_1280.jpg")
+```
+
+.footnote[Source: https://pixabay.com/photos/audience-crowd-people-persons-828584/ Pixabay Licence]
+
+
+???
 
 - shows *anti-establishment* attitude
 
@@ -132,16 +137,24 @@ class: top, left
 
 ---
 
-# AfD as a nucleus of the German right-wing movement
+# AfD as a nucleus of the German right-wing movement?
+
+
+
+
+```{r out.width="80%"}
+knitr::include_graphics("https://upload.wikimedia.org/wikipedia/commons/thumb/b/b8/Alternative-fuer-Deutschland-Logo-2013.svg/2880px-Alternative-fuer-Deutschland-Logo-2013.svg.png")
+```
+
+
+???
 
 
 The AfD ...
 
 - engages in *close contacts to far-right*
 
-- recruits (ex-)*nazis*
-
-- Indirect *support of violence* towards minorities:
+- Appears to *support violence* towards minorities:
 
 >    "Wenn der Staat die Bürger nicht mehr schützen kann,
 >    gehen die Menschen auf die Straße und schützen sich selber."
@@ -159,11 +172,11 @@ class: top, left
 
 Populist party support is fueled by ...
 
-- weak economy ("rust belt hypothesis")
+- weak economy ("rust belt hypothesis") `r icon::fa("industry")`
 
-- high immigration ("flooding hypothesis")
+- high immigration ("flooding hypothesis") `r icon::fa("walking")`
 
-- cultural patterns ("Saxonia hypothesis")
+- cultural patterns ("Saxonia hypothesis") `r icon::fa("flag")`
 
 
 
@@ -282,7 +295,11 @@ class: top, left
 
 - Election related data were obtained from [Bundeswahlleiter 2017](https://www.bundeswahlleiter.de/bundestagswahlen/2017/ergebnisse.html)
 
-- Personality data (n = 22000) were collected by the authors
+- Personality data (n = 12444) were collected by the authors
+
+- Some ZIP codes could not be matched to electoral districts
+
+- Data and analysis are accessible at Github: https://github.com/sebastiansauer/afd_values
 
 - Outcome variable: `afd_votes` (proportion) was log-transformed for better approximation to normality
 
@@ -291,6 +308,24 @@ class: top, left
 knitr::include_graphics("img/p_afd_prop_skewness.png")
 ```
 
+
+
+# Personality model CHOUGHS
+
+
+- Seven personality types according to CHOUGHS model
+
+  - C onformism
+  - H endonism 
+  - O ut of responsibility 
+  - U nderstand 
+  - G ourmets 
+  - H armony 
+  - S elf-determined 
+  
+- Sample: approx. 100k face-to-face interviews (stratified by sex and age)
+- Multi dimensional scaling was used to devise types
+- CHOUGHS builts on Schwartz' values model
 
 
 
@@ -305,7 +340,13 @@ knitr::include_graphics("img/p_afd_prop_skewness.png")
 
 - 2000 iterations,  2 chains, 1/2 burn-in
 
-- Information criteria (WAIC) were used for model comparison
+- Multi level regression modeling (varying intercepts)
+
+- The WAIC was used for to compare model performance:
+
+  - is an estimate for *out-of-sample* model performance
+  - based on information theory
+  - WAIC is similar to the AIC but less restrictive 
 
 
 
@@ -338,7 +379,7 @@ knitr::include_graphics("img/p_afd_prop_skewness.png")
 afd_prop_log_z ~ dnorm(mu, sigma),
 
 # regression:
-mu <- beta0[state_id] +  beta1*for_prop_z    + beta2*unemp_prop_z +
+mu <- beta0[state_id] + beta1*for_prop_z     + beta2*unemp_prop_z +
   beta3*enjoyer       + beta4*harmony_seeker + beta5*self_determined +
   beta6*appreciater   + beta7*conformist     + beta8*type_unknown +
   beta9*responsibility_denier,
@@ -359,27 +400,19 @@ sigma2 ~ dcauchy(0, 1)
 
 class: middle, center, inverse
 
-# Results
+# Results: Model comparison
 
 ---
 
 
-# Comparing model errors
 
 
-```{r pred-error, out.width="100%"}
-knitr::include_graphics("img/p_mod_err_boxplots.png")
-```
-
----
-
-
-# No (strong) evidence of predictive power of our personality data
+# State is the strongest predictor
 
 ```{r}
 stan_model_comparison_output <- read.csv(paste0(proj_root,"/objects/model_comparison.csv"))
 
-if (nrow(stan_model_comparison_output != 7)) warning("Number of included models is incorrect!")
+if (nrow(stan_model_comparison_output) != 9) warning("Number of included models is incorrect!")
 
 ```
 
@@ -395,7 +428,9 @@ tibble::tribble(
    "m3b",       "east (ML) + foreign + unemp ",
    "m4b",       "state (ML) + foreign + unemp",
   "m5b",        "state (ML) + foreign + unemp + personality",
-  "m6b",        "east (ML) + foreign + unemp + personality"
+  "m6b",        "east (ML) + foreign + unemp + personality",
+  "m7b",        "personality",
+  "m8b",        "personality without type 'unknown'"
   
   ) -> model_spec
 
@@ -403,7 +438,7 @@ stan_model_comparison_output %>%
   full_join(model_spec) %>% 
   mutate_if(is.numeric, round, 2) %>% 
   select(model, predictors, WAIC, pWAIC, SE, weight) %>% 
-  arrange(WAIC) -> stan_model_comparison_output2
+  arrange(WAIC) -> stan_model_comparison_output2 
 
 ```
 
@@ -425,12 +460,45 @@ stan_model_comparison_output2 %>%
 
 
 .footnote[ML: Multi Level]
+
+---
+
+
+# Comparing model errors
+
+
+```{r pred-error, out.width="100%"}
+knitr::include_graphics("img/p_mod_err_boxplots.png")
+```
+
+---
+
+
+
+
+
+# R squared estimates for each model
+
+Beware: Unadjusted $R^2$ estimates, prone to overfitting
+
+
+```{r}
+knitr::include_graphics(paste0(proj_root, "/img/p_r2_all_models.png"))
+```
+
+
+---
+
+class: middle, center, inverse
+
+# Results: Most favorable model
+
 ---
 
 
 # Model specification of most favorable model
 
-predictors: state (as multi level) + foreign + unemp
+Model predictors: state (as multi level) + foreign + unemp
 
 ```{r best-model-spec, eval = FALSE, echo = TRUE}
 # Likelihood:
@@ -453,25 +521,38 @@ beta2  ~ dnorm(0, 1)
 
 # Coefficients of the most favorable model
 
-predictors: state (as multi level) + foreign + unemp
+Model predictors: state (as multi level) + foreign + unemp
 
 
-```{r fav-model, echo=FALSE}
+```{r fav-model, echo=FALSE, dpi = 300, out.width="80%"}
 
 best_model_precis <- read_csv(paste0(proj_root, "/objects/best_model_precis.csv"))
 
 best_model_precis %>% 
   rename(Coefficient = X1) %>% 
   mutate_if(is.numeric, round, digits = 2) %>% 
-  DT::datatable(options = list(pageLength = 5))
+  filter(Coefficient %in% c("sigma", "beta1", "beta2")) %>%  
+  ggplot(aes(y = Coefficient)) +
+  geom_errorbarh(aes(xmin = `lower 0.89`, xmax = `upper 0.89`), height = .1) +
+  geom_point(aes(x = Mean), color = "red", size = 2) +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "grey60") +
+  theme_classic() +
+  labs(x = "Value",
+       caption = "Note. Error bars indicate 89% mass intervals. Red dots refer to the mean.") +
+  annotate("label", x = c(1.5, .5, 1), y = c("beta2", "beta1", "sigma"), 
+           label = c("unemployment rate", "foreigner rate", "residual sd"),
+           hjust = 1,
+           color = "grey60")
 ```
 
 
+.footnote[Only level 1 coefficients are shown.]
+
 ---
 
-# Traceplot of most favorable model
+# Big fat hairy catterpillars, as it should be
 
-predictors: state (as multi level) + foreign + unemp
+Model predictors: state (as multi level) + foreign + unemp
 
 
 ```{r m15trace}
@@ -481,7 +562,10 @@ knitr::include_graphics("img/traceplot_m4b.png")
 ---
 
 
-# Checking model additivity assumption of best model
+# Model additivity assumption of best model
+
+Model predictors: state (as multi level) + foreign + unemp
+
 
 ```{r out.width="80%"}
 knitr::include_graphics("img/p_best_model_pred_err.png")
@@ -492,9 +576,9 @@ knitr::include_graphics("img/p_best_model_pred_err.png")
 
 ---
 
-# Posterior distributions of parameters of best model
+# Posterior distributions  of best model
 
-predictors: state (as multi level) + foreign + unemp
+Model predictors: state (as multi level) + foreign + unemp
 
 
 ```{r out.width = "100%"}
@@ -508,9 +592,9 @@ knitr::include_graphics("img/p-post-best-model.png")
 
 
 
-# Comparing observed and estimated AfD votes (as to best model)
+# Observed vs. estimated AfD votes
 
-predictors: state (as multi level) + foreign + unemp
+Model predictors: state (as multi level) + foreign + unemp
 
 ```{r model-obs-est, out.width="100%"}
 knitr::include_graphics("img/modelest-vs-obs.png")
@@ -573,11 +657,13 @@ class: top, left
 
 - *Observational research* is a very *limited* guide for *causal* interpretations
 
-- *Fitting issues* with *count* models warrant more investigation
+- *Overfitting*  (and underfitting) is to be expected
 
-- *Overfitting* may be present (and underfitting)
+- *Reduced* sample size of electoral disctricts warrants further investigation
 
-- *Reduced* sample size of electoral disctricts is problematic
+- *Explorative* study, no strong conclusions warranted
+
+- *More models* are possible (but inject researchers' degree of freedom)
 
 ---
 
@@ -594,7 +680,7 @@ Sebastian Sauer
 #### `r icon::fa("envelope", size = 1)` ssauer@posteo.de
 
  
-#### `r icon::fa("file", size = 1)` Get slides here: XXX
+#### `r icon::fa("file", size = 1)` Get slides here:  https://github.com/sebastiansauer/afd_values
 
 
 CC-BY
