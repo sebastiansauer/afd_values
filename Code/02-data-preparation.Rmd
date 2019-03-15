@@ -152,7 +152,19 @@ d <- d %>%
 ```
 
 
+Does z-standardizing exert an impact here?
 
+
+```{r}
+d %>% 
+  select(afd_prop_log) %>% 
+  sjmisc::std() %>% 
+  summarise_all(list(skewness = ~skewness(.),
+                     kurtosis = ~kurtosis(.)))
+```
+
+
+That makes no difference.
 ## afd_prop sqrt
 
 ```{r results = "hold"}

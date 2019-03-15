@@ -40,6 +40,7 @@ library(pradadata)  # elec data
 library(tidyverse)
 library(knitr)
 library(tidylog)
+library(rprojroot)
 
 
 
@@ -48,12 +49,24 @@ library("rstanarm")
 ```
 
 
+
+# Setup
+
+
+```{r}
+proj_root <- rprojroot::find_root(as.root_criterion(is_rstudio_project))
+
+options(mc.cores = parallel::detectCores())
+```
+
+
+
 # Load data
 
 Raw data:
 
 ```{r}
-d <- read_csv("../objects/d_prepared.csv")
+d <- read_csv(paste0(proj_root, "/objects/d_prepared.csv"))
 d <- as.data.frame(d)
 ```
 
@@ -85,8 +98,8 @@ dim(d79)
 
 objects from models:
 
-```{r}
-if (params$readonly == TRUE) load("../objects/models.Rda")
+```{r eval = params$readonly}
+load(paste0(proj_root, "/objects/models.Rda"))
 ```
 
 
@@ -124,7 +137,7 @@ my_traceplot <- function(model) {
 
 I use this list to store the model outputs.
 
-```{r eval = param}
+```{r eval = !params$readonly}
 if (!(exists("models"))) models <- list()
 ```
 
@@ -256,6 +269,88 @@ my_traceplot(m0c)
 models[["m0c"]] <- m0c
 WAIC(m0c)
 ```
+
+
+
+
+
+### m0d: As m0b, but outcome not standardized
+
+```{r m0d, eval = TRUE, results = "hide"}
+d_model <- d %>% 
+  select(one_of(c(consumer_types, standard_model_vars, "afd_prop_log" ))) %>% 
+  drop_na() %>% 
+  as.data.frame()
+dim(d_model)
+
+m0d <- map2stan(
+  alist(
+    afd_prop_log ~ dnorm(mu, sigma),    
+    mu <- alpha,
+    alpha ~ dnorm(0, 1),
+    sigma ~ dcauchy(0, 1)
+  ),
+  data = d_model,
+  chains = 2,
+  cores = 2
+)
+```
+
+
+```{r}
+precis(m0d, depth = 2)
+coeftab(m0d)
+my_traceplot(m0d)
+models[["m0d"]] <- m0d
+WAIC(m0d)
+```
+
+
+
+
+
+
+
+## m0e: null model for afd_prop POISSON
+
+
+
+
+```{r m0e, eval = TRUE, results = "hide"}
+d_model <- d %>% 
+  select(one_of(c(consumer_types, standard_model_vars, "state_id", "afd_votes"))) %>% 
+  drop_na() %>% 
+  as.data.frame()
+
+dim(d_model)
+
+m0e <- map2stan(
+  alist(
+    afd_votes ~ dpois(lambda), 
+    
+    log(lambda) <- a,
+    
+    a <- dnorm(0, 1)
+ ),
+  data = d_model,
+  chains = 2,
+  cores = 2,
+  iter = 2000, warmup = 1500,
+  control = list(adapt_delta = 0.95)
+)
+```
+
+
+```{r}
+precis(m0e, depth = 2)
+coeftab(m0e)
+my_traceplot(m0e)
+models[["m0e"]] <- m0e
+WAIC(m0c)
+```
+
+
+
 
 
 
@@ -589,6 +684,48 @@ WAIC(m3b)
 
 
 
+### M03d: east + for_prop-z + unemp_prop-z, outcome afd_prop_log
+
+Outcome not standardiezd
+
+```{r m3b, eval = TRUE, results = "hide"}
+d_model <- d %>% 
+  select(one_of(c(consumer_types, standard_model_vars, "afd_prop_log"))) %>% 
+  drop_na() %>% 
+  as.data.frame()
+
+dim(d_model)
+
+m3d <- map2stan(
+  alist(
+    afd_prop_log ~ dnorm(mu, sigma),    
+    mu <- beta0[east] +  beta1*for_prop_z + beta2*unemp_prop_z,
+    beta0[east] ~ dnorm(0, sigma2),
+    sigma ~ dcauchy(0, 1),
+    beta1 ~ dnorm(0, 1),
+    beta2 ~ dnorm(0, 1),
+    sigma2 ~ dcauchy(0, 1)
+  ),
+  data = d_model,
+  chains = 2,
+  cores = 2,
+  iter = 5000, warmup = 1000
+)
+```
+
+
+
+```{r}
+precis(m3d, depth = 2)
+coeftab(m3d)
+my_traceplot(m3d)
+models[["m3d"]] <- m3d
+WAIC(m3d)
+```
+
+
+
+
 ### M04: state + for_prop-z + unemp_prop-z
 
 ```{r m4, eval = TRUE, results = "hide"}
@@ -823,7 +960,7 @@ WAIC(m5b)
 
 
 
-### M6b: east (ML) + foreign + unemp + 8 consumer
+### M6b: MAIN HYP: east (ML) + foreign + unemp + 8 consumer
 
 
 
@@ -872,6 +1009,65 @@ models[["m6b"]] <- m6b
 
 WAIC(m6b)
 ```
+
+
+
+
+
+
+
+
+
+### M6d: MAIN HYP: east (ML) + foreign + unemp + 8 consumer, afd_prop_log as outcome 
+
+OUtcome is not z-standardized
+
+
+```{r m6b}
+d_model <- d %>% 
+  select(one_of(c(consumer_types, standard_model_vars, "east", "afd_prop_log"))) %>% 
+  drop_na() %>% 
+  as.data.frame()
+
+dim(d_model)
+
+m6d <- map2stan(
+  alist(
+    afd_prop_log ~ dnorm(mu, sigma),
+    mu <- beta0[east] +  beta1*for_prop_z + beta2*unemp_prop_z +
+      beta3*enjoyer + beta4*harmony_seeker + beta5*self_determined +
+      beta6*appreciater + beta7*conformist + beta8*type_unknown +
+      beta9*responsibility_denier,
+    beta0[east] ~ dnorm(0, sigma2),
+    sigma ~ dcauchy(0, 1),
+    sigma2 ~ dcauchy(0, 1),
+    beta1 ~ dnorm(0, 1),
+    beta2 ~ dnorm(0, 1),
+    beta3 ~ dnorm(0, 1),   
+    beta4 ~ dnorm(0, 1),    
+    beta5 ~ dnorm(0, 1),    
+    beta6 ~ dnorm(0, 1),
+    beta7 ~ dnorm(0, 1),
+    beta8 ~ dnorm(0, 1),
+    beta9 ~ dnorm(0, 1)
+  ),
+  data = d_model,
+  chains = 2,
+  cores  = 2
+)
+```
+
+
+
+```{r out.width="100%"}
+precis(m6d, depth = 2)
+coeftab(m6d)
+my_traceplot(m6d)
+models[["m6d"]] <- m6d
+
+WAIC(m6d)
+```
+
 
 
 
@@ -976,7 +1172,266 @@ WAIC(m8b)
 ```
 
 
+
+
+### M9b: As M4b, but count model (Poisson)
+
+
+
+
+
+
+```{r m9b}
+d_model <- d %>% 
+  select(one_of(c(consumer_types, standard_model_vars, "state_id", "afd_votes"))) %>% 
+  drop_na() %>% 
+  as.data.frame()
+
+dim(d_model)
+
+m9b <- map2stan(
+  alist(
+    afd_votes ~ dpois(lambda), 
+    
+    log(lambda) <- beta0[state_id] +  beta1*for_prop_z + beta2*unemp_prop_z,
+    
+    beta0[state_id] ~ dnorm(0, sigma2),
+    
+    sigma2 ~ dcauchy(0, 1),
+    
+    c(beta1, beta2) ~ dnorm(0, 1)
+ ),
+  data = d_model,
+  chains = 2,
+  cores  = 2
+)
+
+
+```
+
+
+
+
+```{r out.width="100%"}
+
+precis(m9b, depth = 2)
+coeftab(m9b)
+my_traceplot(m9b)
+models[["m9b"]] <- m9b
+
+WAIC(m9b)
+```
+
+
+
+
+### M10c: As M4b, but not z-standardized outcome
+
+
+
+
+```{r m10c, eval = TRUE, results = "hide"}
+d_model <- d %>% 
+  select(one_of(c(consumer_types, standard_model_vars, "state_id", "afd_prop_log"))) %>% 
+  drop_na() %>% 
+  as.data.frame()
+
+dim(d_model)
+
+m10c <- map2stan(
+  alist(
+    afd_prop_log ~ dnorm(mu, sigma),    
+    mu <- beta0[state_id] +  beta1*for_prop_z + beta2*unemp_prop_z,
+    beta0[state_id] ~ dnorm(0, sigma2),
+    sigma ~ dcauchy(0, 1),
+    sigma2 ~ dcauchy(0, 1),
+    beta1 ~ dnorm(0, 1),
+    beta2 ~ dnorm(0, 1)
+  ),
+  data = d_model,
+  chains = 2,
+  cores = 2,
+  iter = 5000, warmup = 3000,
+  control = list(adapt_delta = 0.99,
+                 max_treedepth = 15)
+)
+```
+
+
+
+```{r out.width="100%"}
+precis(m10c, depth = 2)
+coeftab(m10c)
+my_traceplot(m10b)
+models[["m10c"]] <- m10c
+```
+
+
+
+
+
+
+### M11d: As M5b, but not z-standardized outcome
+
+
+
+
+```{r m11d, eval = TRUE, results = "hide"}
+d_model <- d %>% 
+  select(one_of(c(consumer_types, standard_model_vars, "state_id", "afd_prop_log"))) %>% 
+  drop_na() %>% 
+  as.data.frame()
+
+dim(d_model)
+
+m11d <- map2stan(
+  alist(
+    afd_prop_log ~ dnorm(mu, sigma),  
+    
+    mu <- beta0[state_id] +  beta1*for_prop_z + beta2*unemp_prop_z +
+      beta3*enjoyer + beta4*harmony_seeker + beta5*self_determined +
+      beta6*appreciater + beta7*conformist + beta8*type_unknown +
+      beta9*responsibility_denier,
+    beta0[state_id] ~ dnorm(0, sigma2),
+    sigma ~ dcauchy(0, 1),
+    sigma2 ~ dcauchy(0, 1),
+    beta1 ~ dnorm(0, 1),
+    beta2 ~ dnorm(0, 1),
+    beta3 ~ dnorm(0, 1),   
+    beta4 ~ dnorm(0, 1),    
+    beta5 ~ dnorm(0, 1),    
+    beta6 ~ dnorm(0, 1),
+    beta7 ~ dnorm(0, 1),
+    beta8 ~ dnorm(0, 1),
+    beta9 ~ dnorm(0, 1)
+  ),
+  
+  data = d_model,
+  chains = 2,
+  cores = 2,
+  iter = 2000, warmup = 1000,
+  control = list(adapt_delta = 0.95,
+                 max_treedepth = 15)
+)
+```
+
+
+
+```{r out.width="100%"}
+precis(m11d, depth = 2)
+coeftab(m11d)
+my_traceplot(m11d)
+models[["m11d"]] <- m11d
+
+
+m11d
+```
+
+
+
+
+
+
+### M12d: As M9b, but with consumer types
+
+
+
+
+
+
+```{r m12d}
+d_model <- d %>% 
+  select(one_of(c(consumer_types, standard_model_vars, "state_id", "afd_votes"))) %>% 
+  drop_na() %>% 
+  as.data.frame()
+
+dim(d_model)
+
+m12d <- map2stan(
+  alist(
+    afd_votes ~ dpois(lambda), 
+    
+    log(lambda) <- beta0[state_id] +  beta1*for_prop_z + beta2*unemp_prop_z +
+      beta3*enjoyer + beta4*harmony_seeker + beta5*self_determined +
+      beta6*appreciater + beta7*conformist + beta8*type_unknown +
+      beta9*responsibility_denier,
+    
+    beta0[state_id] ~ dnorm(0, sigma2),
+    
+    sigma ~ dcauchy(0, 1),
+    sigma2 ~ dcauchy(0, 1),
+    
+    beta1 ~ dnorm(0, 1),
+    beta2 ~ dnorm(0, 1),
+    beta3 ~ dnorm(0, 1),   
+    beta4 ~ dnorm(0, 1),    
+    beta5 ~ dnorm(0, 1),    
+    beta6 ~ dnorm(0, 1),
+    beta7 ~ dnorm(0, 1),
+    beta8 ~ dnorm(0, 1),
+    beta9 ~ dnorm(0, 1)    
+  ),
+  data = d_model,
+  chains = 4,
+  cores = 2,
+  iter = 2000, warmup = 1000,
+  control = list(adapt_delta = 0.95,
+                 max_treedepth = 15)
+)
+
+
+```
+
+
+
+
+```{r out.width="100%"}
+
+precis(m12d, depth = 2)
+coeftab(m12d)
+my_traceplot(m12d)
+models[["m12d"]] <- m12d
+
+WAIC(m12d)
+```
+
+
+
+
+
+### m4b_stan: STANARM variant
+
+
+
+```{r}
+
+m4b_stan <- stan_glmer(afd_prop ~ for_prop_z + unemp_prop_z +
+                                (1 |state_id), data = d79)
+
+
+summary(m4b_stan)
+
+rsq <- bayes_R2(m4b_stan)
+print(median(rsq))  
+
+prior_summary(object = m4b_stan)
+
+print(m4b_stan, digits = 2)
+```
+
+
+
+
+
+
+
+
 # Save results
+
+```{r}
+names(models)
+length(names(models))
+```
 
 
 ```{r}

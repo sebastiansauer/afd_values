@@ -1,0 +1,30 @@
+name;name_old;included;multilevel;samplesize;predictors;k;outcome distribution;"sigma 
+distribution";outcome variable;comment
+m00;m00;no;no;299;none;0;Gaussian;Gaussian;afd_prop_log_z;null model
+m00a;m0a;no;no;79;none;0;Gaussian;Gaussian;afd_prop_log_z;null model
+m00b;m0b;yes;no;79;none;0;Gaussian;Cauchy;afd_prop_log_z;null model
+m00c;m0c;no;no;;none;0;Gaussian;Cauchy;afd_prop ;null model
+m01a;m1a;no;no;79;unemp, foreign, east, 8 consumer types;11;Gaussian;Gaussian;afd_prop_log_z;
+m01b;m1b;yes;no;79;unemp, foreign, east, 8 consumer types;11;Gaussian;Cauchy;afd_prop_log_z;
+m02;m2;no;no;299;unemp, foreign, east ;3;Gaussian;Gaussian;afd_prop_log_z;
+m02a;m2a;no;no;79;unemp, foreign, east ;3;Gaussian;Gaussian;afd_prop_log_z;
+m02b;m2b;yes;no;79;unemp, foreign, east ;3;Gaussian;Cauchy;afd_prop_log_z;
+m03;m3;no;east;299;unemp, foreign, east ;3;Gaussian;Gaussian;afd_prop_log_z;
+m03a;m3a;no;east;79;unemp, foreign, east ;3;Gaussian;Gaussian;afd_prop_log_z;
+m03b;m3b;yes;east;79;unemp, foreign, east ;3;Gaussian;Cauchy;afd_prop_log_z;
+m04;m4;no;state;299;unemp, foreign, state;3;Gaussian;Gaussian;afd_prop_log_z;
+m04a;m4a;no;state;79;unemp, foreign, state;3;Gaussian;Gaussian;afd_prop_log_z;
+m04b;m4b;yes;state;79;unemp, foreign, state;3;Gaussian;Cauchy;afd_prop_log_z;
+m05b;m5b;yes;state;79;unemp, foreign, state, 8 consumer types;11;Gaussian;Cauchy;afd_prop_log_z;
+m05;m5;yes;state;79;unemp, foreign, state;3;Gaussian;Cauchy;afd_prop;outcome not standardized
+m06b;m6b;yes;east;79;unemp, foreign, east, 8 consumer types;11;Gaussian;Cauchy;afd_prop_log_z;Hypothesized model
+m07b;m7b;yes;no;79;8 consumer types;8;Gaussian;Cauchy;afd_prop_log_z;
+m08b;m8b;yes;no;79;7 consumer types (no NA-variables);7;Gaussian;Cauchy;afd_prop_log_z;
+m09b;m9b;yes;state;79;unemp, foreign, state;3;Poisson;Cauchy;afd_prop;
+m10c;m10c;yes;state;79;unemp, foreign, state;3;Gaussian;Cauchy;afd_prop_log;outcome not standardized
+m06d;m6d;yes;east;79;unemp, foreign, east, 8 consumer types;11;Gaussian;Cauchy;afd_prop_log;Hypothesized model
+m03d;m3d;yes;east;79;unemp, foreign, east ;3;Gaussian;Cauchy;afd_prop_log;outcome not standardized
+m00d;m0d;yes;no;79;none;0;Gaussian;Cauchy;afd_prop_log;outcome not standardized
+m00e;m0e;yes;no;79;none;0;Poisson;Cauchy;afd_prop ;outcome not standardized
+m11d;m11d;yes;state;79;unemp, foreign, state, 8 consumer types;11;Gaussian;Cauchy;afd_prop_log;outcome not standardized
+m12d;m12d;yes;state;79;unemp, foreign, state, 8 consumer types;11;Poisson;Cauchy;afd_prop;

@@ -119,7 +119,8 @@ names(models)
 ## Compare null models
 
 ```{r compare-null-models}
-compare_null_models <- compare( models[["m0a"]], models[["m0b"]], models[["m0c"]])
+compare_null_models <- compare( models[["m0a"]], models[["m0b"]], 
+                                models[["m0c"]], models[["m0d"]])
 compare_null_models
 ```
 
@@ -136,26 +137,25 @@ Here are only the Cauchy models:
 
 
 ```{r}
-
-models79 <- models[c("m0b",
-                     "m1b",
-                     "m2b",
-                     "m3b",
-                     "m4b",
-                     "m5b",
-                     "m6b")]
-
-length(models79)
-
-names(models79)
 names(models)
 
-model_names <- names(models79)
+model_names <- names(models)
+
 
 ```
 
 
 ### Compare the models 
+
+
+
+Model descritpion file:
+
+
+```{r}
+model_description <- read_csv2(paste0(proj_root, "/objects/model-description.csv"))
+```
+
 
 
 Only models with Cauchy Sigmas:
@@ -169,15 +169,29 @@ compare_reduced_sample <- compare(models[["m0b"]],
                                   models[["m5b"]],
                                   models[["m6b"]],
                                   models[["m7b"]],
-                                  models[["m8b"]])
+                                  models[["m8b"]],
+                                  models[["m9b"]],
+                                  models[["m10c"]],
+                                  models[["m6d"]],
+                                  models[["m0d"]],
+                                  models[["m0e"]],
+                                  models[["m3d"]],
+                                  models[["m11d"]],
+                                  models[["m12d"]])
 
 model_comparison <- compare_reduced_sample@output %>% 
   rownames_to_column() %>% 
   as_tibble() %>% 
-  mutate(model = str_extract(rowname, "m\\d.")) %>% 
-  select(-rowname)
+  mutate(model = str_extract(rowname, "m\\d\\w+")) %>% 
+  select(-rowname) %>% 
+  left_join(model_description, by = c("model" = "name_old")) %>% 
+  filter(included == "yes", `outcome variable` %in% c( "afd_prop_log", "afd_prop")) %>% 
+#  select(name, multilevel, k, predictors, `outcome distribution`, WAIC, SE, weight) %>% 
+  arrange(WAIC)
 
 model_comparison %>% kable()
+
+
 ```
 
 
@@ -203,6 +217,29 @@ write_csv(model_comparison,
 # Best model
 
 
+## Best bunch of best models (top 5)
+
+```{r}
+best_name_vector <- model_comparison %>% 
+  arrange(WAIC) %>% 
+  slice(1:5) %>% 
+  pull(model)
+  
+best_name_vector
+```
+
+
+```{r}
+models_short <- models[best_name_vector]
+names(models_short)
+names(models)
+
+models79 <- models_short
+```
+
+
+
+
 ## Get best model 
 
 Which model ist best? Let's define the model with the lowest WAIC as best:
@@ -219,14 +256,12 @@ best_model
 And now extract the *name* of the best model:
 
 ```{r}
-best_model_name <-
+best_model_name_long <-
   best_model %>%
   pull(model_name)
 
-best_model_name
+best_model_name <- str_extract(best_model_name_long, "\\w\\d{1,2}\\w")
 
-if (best_model_name == 'models[[\"m4a\"]]') best_model_name = "m4a"
-if (best_model_name == 'models[[\"m4b\"]]') best_model_name = "m4b"
 
 best_model_name
 ```
@@ -250,6 +285,8 @@ write.csv(best_model_precis,
 ```{r}
 my_traceplot(models[[best_model_name]])
 ```
+
+Save by hand!
 
 
 ## State names 
@@ -294,12 +331,13 @@ comp_abs_error <- function(model, data, fun = mean) {
     summarise_all(fun) %>% 
     gather() %>% 
     rename(estimate = value) %>% 
-    mutate(afd_prop_log_z = data$afd_prop_log_z,
-           error = abs(estimate - afd_prop_log_z)) %>% 
+    mutate(afd_prop_log = data$afd_prop_log,
+           error = abs(estimate - afd_prop_log)) %>% 
     pull(error) -> error_vec
   
   return(error_vec)
 }
+
 
 ```
 
@@ -332,7 +370,7 @@ p_mod_err_density <- model_error_long %>%
   geom_density(aes(fill = is_best_model)) +
   theme_classic() +
   labs(title = "Distribution of absolute prediction error per model",
-       caption = "Note. Target variable is log. of AfD proportion (z-standardized)")
+       caption = "Note. Target variable is log. of AfD proportion")
 p_mod_err_density
 
 ggsave(filename = paste0(proj_root, "/img/p_mod_err_density.png"),
@@ -346,7 +384,7 @@ p_mod_err_boxplots <- model_error_long %>%
   theme_classic() +
   geom_boxplot(aes(fill = is_best_model))  +
   labs(title = "Distribution of absolute prediction error per model",
-       caption = "Note. Target variable is log. of AfD proportion (z-standardized)",
+       caption = "Note. Target variable is log. of AfD proportion",
        y = "Absolute error")
 p_mod_err_boxplots
 
@@ -375,7 +413,7 @@ d79 %>%
   geom_histogram() +
   geom_density()  +
   labs(title = "Distribution of absolute prediction error of best performing model",
-       caption = "Note. Target variable is log. of AfD proportion (z-standardized)")
+       caption = "Note. Target variable is log. of AfD proportion ")
 ```
 
 
@@ -438,6 +476,7 @@ comp_avg_pred <- function(model, data, fun = mean) {
   return(predictions_vec)
 }
 
+
 ```
 
 
@@ -472,12 +511,12 @@ Note ther's also no information about variability (ie, only point estimate).
 
 
 ```{r}
-my_r2 <- function(error, observed = d79$afd_prop_log_z) {
+my_r2 <- function(error, observed = d79$afd_prop_log) {
   
-  output <- 1 - var(error) / var(observed)
+  output <- 1 - var(error)/var(observed)
 }
 
-r2_bestmodel <- my_r2(error = d79$err_avg, observed = d79$afd_prop_log_z)
+r2_bestmodel <- my_r2(error = d79$err_avg, observed = d79$afd_prop_log)
 
 r2_bestmodel
 
@@ -510,16 +549,19 @@ comp_err <- function(estimated, observed) {
 
 
 
-comp_rsquared <- function(model, observed_data = d79$afd_prop_log_z)  {
+comp_rsquared <- function(model, observed_data = d79$afd_prop_log)  {
   
   posterior_per_person <- link(model) %>% t()
   
   r2_samples <- posterior_per_person %>% 
     as_tibble() %>% 
-    transmute_all(funs(error_value = comp_err(estimated = ., observed = observed_data))) %>% 
+    transmute_all(list(error_value = ~ comp_err(estimated = ., observed = observed_data))) %>% 
     summarise_all(my_r2) %>% 
     gather(key = sample, value = r2) 
 }
+
+
+names(models79)
 
 ```
 
@@ -528,7 +570,7 @@ Apply the function on all models:
 
 ```{r}
 r2_all_models <- models79 %>% 
-  map(comp_rsquared) %>% 
+  purrr::map(comp_rsquared) %>% 
   set_names(names(models79))
 ```
 
@@ -541,6 +583,9 @@ Convert it to a long data frame, and rememeber the names of the models:
 r2_all_models_df <- r2_all_models %>% 
   map_dfr("r2") %>% 
   gather(key = model, value = r2)
+
+r2_all_models_df %>% 
+  head()
 ```
 
 
@@ -568,7 +613,7 @@ p_r2_all_models <- r2_all_models_df %>%
   mutate(hightes_r2_md = model == highest_r2_md) %>% 
   ggplot(aes(x = model, y = r2, fill = hightes_r2_md)) +
   geom_boxplot() +
-  labs(y = "R squared") +
+  labs(y = expression(paste("R"^2))) +
   theme_classic()
 
 p_r2_all_models
@@ -604,7 +649,7 @@ model_error %>%
 names(model_error_df) <- names(models79)
 
 model_error_df %>% 
-  mutate(afd_prop_log_z = d79$afd_prop_log_z,
+  mutate(afd_prop_log = d79$afd_prop_log,
          id = 1:nrow(model_error_df)) -> model_error_df
 
 
@@ -630,7 +675,7 @@ model_error_IQR_df %>%
 
 
 model_error_df %>% 
-  gather(key = model, value = error, -c(afd_prop_log_z, id)) %>% 
+  gather(key = model, value = error, -c(afd_prop_log, id)) %>% 
   mutate(stat = "median") -> model_error_df_long
 
 model_error_df_long %>% 
@@ -652,8 +697,10 @@ Now plot:
 
 
 as_tibble(md_abs_error_all_models) %>% 
-  mutate(model = model_names,
-         best_model = ifelse(model_names == best_model_name, TRUE, FALSE)) -> md_abs_error_all_models
+  mutate(model = best_name_vector,
+         best_model = ifelse(model == best_model_name, TRUE, FALSE)) -> md_abs_error_all_models
+
+md_abs_error_all_models
 
 glimpse(md_abs_error_all_models)
 
@@ -697,15 +744,16 @@ ggsave(filename = paste0(proj_root, "/img/model-error-comp.pdf"))
 
 ```{r p-obs-est-err-values, out.width="100%"}
 posterior_per_person_best_model <- link(models[[best_model_name]])
+
+d79$area_nr <- as.integer(d79$area_nr)
   
 posterior_per_person_best_model %>%  
   as_tibble() %>% 
-    summarise_all(median) %>% 
+    summarise_all(median, na.rm = TRUE) %>% 
     gather() %>% 
     rename(estimate = value) %>% 
-  add_column(area_nr = 1:nrow(.)) %>% 
-  full_join(d79) %>%
-  mutate(error = abs(estimate - afd_prop_log_z),
+  cbind(d79) %>% 
+  mutate(error = abs(estimate - afd_prop_log),
          top05 = percent_rank(error) >= .95) %>% 
   drop_na(estimate) -> d_short_w_pred_err 
 
@@ -713,14 +761,16 @@ dim(d_short_w_pred_err)
 
 
 polygon_pos <- data.frame(
-  x = c(-2, 2, 2,    -2, 2, -2, -2 ),
-  y = c(-2, -2, 2,      -2, 2, 2, -2),
+  x = c(-3, 1, 1,    -3, 1, -3, -3 ),
+  y = c(-3, -3, 1,      -3, 1, 1, -3),
   value = c("underestimates", "underestimates", "underestimates", "overestimates", "overestimates", "overestimates", "overestimates")
 )
  
+sample_size <- nrow(d79)
+
 p_d_short_w_pred_err <- d_short_w_pred_err %>%  
   ggplot() +
-  aes(x = afd_prop_log_z, y = estimate) +
+  aes(x = afd_prop_log, y = estimate) +
   geom_abline(slope = 1, intercept = 0, color = "grey60") +
   geom_polygon(data = polygon_pos, aes(x = x, y = y, fill = value), alpha = .1) +
   geom_point(data = filter(d_short_w_pred_err, top05 == TRUE),
@@ -732,12 +782,12 @@ p_d_short_w_pred_err <- d_short_w_pred_err %>%
              alpha = .8,
              size = 3) +
   ggrepel::geom_label_repel(aes(label = area_name), data = filter(d_short_w_pred_err, top05 == TRUE)) +
-  annotate("text", x = 2, y = -2, label = "model understimates", hjust = 1, vjust = 0) +
-  annotate("text", x = -2, y = 2, label = "model overestimates", hjust = 0, vjust = 1) +
-  labs(x = "Log. of observed AfD votes (z-standardized)",
-       y = "Log. of estimated AfD votes (standardized)",
+  annotate("text", x = 1, y = -3, label = "model understimates", hjust = 1, vjust = 0) +
+  annotate("text", x = -3, y = 1, label = "model overestimates", hjust = 0, vjust = 1) +
+  labs(x = "Log. of observed AfD votes",
+       y = "Log. of estimated AfD votes",
        title = "Modelled vs. observed AFD votes. Top 5 percent predicted errors are labelled",
-       caption = "n=79 electoral districts; data provided by Bundeswahlleiter 2017") +
+       caption = paste0("n = ", sample_size, " electoral districts; data provided by Bundeswahlleiter 2017")) +
   guides(fill = FALSE) +
   theme_classic()
 

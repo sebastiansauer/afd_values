@@ -4,7 +4,7 @@ subtitle: "A Bayesian modeling approach"
 author: |
   Sebastian Sauer,
   Oliver Gansser
-date: "FOM<br>DGPs 2018"
+date: "FOM<br>ECDA 2019"
 css: ["default-fonts", "default"]
 output:
   xaringan::moon_reader:
@@ -308,6 +308,8 @@ class: top, left
 knitr::include_graphics("img/p_afd_prop_skewness.png")
 ```
 
+---
+
 
 
 # Personality model CHOUGHS
@@ -327,6 +329,10 @@ knitr::include_graphics("img/p_afd_prop_skewness.png")
 - Multi dimensional scaling was used to devise types
 - CHOUGHS builts on Schwartz' values model
 
+.footnote[Source:
+Gansser, O., & Lübke, K. (2018). *The development of new typologies of behaviour based on universal human values and purchasing behavior*, in: Archives of Data Science, Series B, in submission.
+Gebauer, H., Haldimann, M., & Saul, C.J. (2017). Service innovations breaking
+institutionalized rules of health care. *Journal of Service Management*, 28(5), 972-935.]
 
 
 ---
@@ -334,7 +340,7 @@ knitr::include_graphics("img/p_afd_prop_skewness.png")
 # Bayes modeling
 
 
-- Stan via the R packages `rstan` and `rethinking`
+- Stan via the R package `rethinking`
 
 - Hamiltonian Markov Chain Monte Carlo (MCMC)
 
@@ -376,7 +382,7 @@ knitr::include_graphics("img/p_afd_prop_skewness.png")
 
 ```{r m9-stan, eval = FALSE, echo = TRUE}
 # Likelihood:
-afd_prop_log_z ~ dnorm(mu, sigma),
+afd_prop_log ~ dnorm(mu, sigma),
 
 # regression:
 mu <- beta0[state_id] + beta1*for_prop_z     + beta2*unemp_prop_z +
@@ -405,64 +411,32 @@ class: middle, center, inverse
 ---
 
 
-
-
 # State is the strongest predictor
+
+
 
 ```{r}
 stan_model_comparison_output <- read.csv(paste0(proj_root,"/objects/model_comparison.csv"))
 
-if (nrow(stan_model_comparison_output) != 9) warning("Number of included models is incorrect!")
 
 ```
 
 
 
-```{r all-models, echo = FALSE}
-
-tibble::tribble(
-  ~model,       ~predictors,
-  "m0b",         "null model",
-   "m1b",       "east + foreign + unemp + personality",
-   "m2b",       "east + foreign + unemp",
-   "m3b",       "east (ML) + foreign + unemp ",
-   "m4b",       "state (ML) + foreign + unemp",
-  "m5b",        "state (ML) + foreign + unemp + personality",
-  "m6b",        "east (ML) + foreign + unemp + personality",
-  "m7b",        "personality",
-  "m8b",        "personality without type 'unknown'"
-  
-  ) -> model_spec
-
+.small[
+```{r}
 stan_model_comparison_output %>% 
-  full_join(model_spec) %>% 
-  mutate_if(is.numeric, round, 2) %>% 
-  select(model, predictors, WAIC, pWAIC, SE, weight) %>% 
-  arrange(WAIC) -> stan_model_comparison_output2 
-
-```
-
-
-
-```{r eval = FALSE}
-print(xtable::xtable(stan_model_comparison_output2, type = "latex"))
-```
-
-
-
-
-```{r model-tabel, echo = FALSE}
-stan_model_comparison_output2 %>% 
+  select(name, predictors, type = outcome.distribution,
+         WAIC, SE, weight) %>% 
+  mutate_if(is.numeric, round, digits = 2) %>% 
   knitr::kable() %>% 
   kableExtra:: kable_styling(bootstrap_options = c("striped", "hover")) %>% 
   row_spec(1, bold = T, color = "blue", background = "yellow")
 ```
+]
 
-
-.footnote[ML: Multi Level]
 
 ---
-
 
 # Comparing model errors
 
@@ -555,8 +529,8 @@ best_model_precis %>%
 Model predictors: state (as multi level) + foreign + unemp
 
 
-```{r m15trace}
-knitr::include_graphics("img/traceplot_m4b.png")
+```{r m15trace, out.width = "50%"}
+knitr::include_graphics("img/traceplot_best_model.png")
 ```
 
 ---
@@ -680,7 +654,7 @@ Sebastian Sauer
 #### `r icon::fa("envelope", size = 1)` ssauer@posteo.de
 
  
-#### `r icon::fa("file", size = 1)` Get slides here:  https://github.com/sebastiansauer/afd_values
+#### `r icon::fa("file", size = 1)` Get slides here:  https://data-se.netlify.com/slides/afd_ecda2019/afd-modeling-ECDA-2019.pdf
 
 
 CC-BY
