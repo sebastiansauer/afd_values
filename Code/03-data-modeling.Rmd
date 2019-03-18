@@ -909,7 +909,7 @@ WAIC(m5)
 
 
 
-### M5b: all predictors, state as multilevel
+### M5b: all predictors, state as multilevel, afd_prop_log_z
 
 
 ```{r mb5}
@@ -1237,6 +1237,9 @@ d_model <- d %>%
   as.data.frame()
 
 dim(d_model)
+
+
+str(d_model$state)
 
 m10c <- map2stan(
   alist(

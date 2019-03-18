@@ -101,6 +101,47 @@ d <- read_csv(paste0(proj_root, "/objects/d_prepared.csv"))
 ```
 
 
+Model descritpion file:
+
+
+```{r}
+model_description <- read_csv2(paste0(proj_root, "/objects/model-description.csv"))
+```
+
+
+```{r}
+best_model_precis <- precis(models[[best_model_name]], depth = 2)@output %>% 
+  rownames_to_column(var = "Coefficient")
+```
+
+
+
+## Define labels
+
+```{r}
+coeff_labels <- tibble(
+  Coefficient = best_model_precis$Coefficient,
+  coeff_label = c(levels(d79$state), "level1_resid", "level2_resid", "foreigner rate", "unemployment rate"))
+)
+
+coeff_labels
+
+best_model_precis <- best_model_precis %>% 
+  full_join(coeff_labels)
+
+best_model_precis
+```
+
+
+Check labels:
+
+```{r}
+d79$state_id %>% unique()
+d79$state %>% unique()
+```
+
+
+
 # Setup
 
 
@@ -148,13 +189,6 @@ model_names <- names(models)
 ### Compare the models 
 
 
-
-Model descritpion file:
-
-
-```{r}
-model_description <- read_csv2(paste0(proj_root, "/objects/model-description.csv"))
-```
 
 
 
@@ -226,6 +260,7 @@ best_name_vector <- model_comparison %>%
   pull(model)
   
 best_name_vector
+
 ```
 
 
@@ -237,6 +272,22 @@ names(models)
 models79 <- models_short
 ```
 
+
+
+## Best models including count
+
+```{r}
+best_name_vector_incl_count <- c(best_name_vector, "m12d", "m9b", "m0e")
+
+
+
+models_short_incl_count <- models[best_name_vector_incl_count]
+names(models_short_incl_count)
+names(models)
+
+models79_incl_count <- models_short_incl_count
+
+```
 
 
 
@@ -272,7 +323,7 @@ best_model_name
 ## Describe best model
 
 ```{r}
-best_model_precis <- precis(models[[best_model_name]], depth = 2)@output
+
 
 write.csv(best_model_precis,
           file = paste0(proj_root, "/objects/best_model_precis.csv"))
@@ -572,7 +623,10 @@ Apply the function on all models:
 r2_all_models <- models79 %>% 
   purrr::map(comp_rsquared) %>% 
   set_names(names(models79))
+
+
 ```
+
 
 
 
@@ -586,6 +640,9 @@ r2_all_models_df <- r2_all_models %>%
 
 r2_all_models_df %>% 
   head()
+
+
+
 ```
 
 
@@ -801,6 +858,68 @@ ggsave(plot = p_d_short_w_pred_err,
                          width = 10, height = 5)
 ```
 
+
+
+
+
+
+# Model coefficients plot of most fav. model
+
+
+## Level 1
+
+```{r}
+
+
+p_best_model_precis_level1 <- best_model_precis %>% 
+  mutate_if(is.numeric, round, digits = 2) %>% 
+  dplyr::filter(Coefficient %in% c("sigma", "beta1", "beta2")) %>%  
+  ggplot(aes(y = coeff_label)) +
+  geom_errorbarh(aes(xmin = `lower 0.89`, xmax = `upper 0.89`), height = .1) +
+  geom_point(aes(x = Mean), color = "red", size = 2) +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "grey60") +
+  theme_classic() +
+  labs(x = "Value",
+       y = "Coefficient",
+       caption = "Note. Error bars indicate 89% percentile intervals. Red dots refer to the mean.") 
+
+p_best_model_precis_level1
+
+
+ggsave(plot = p_best_model_precis_level1,
+       filename = paste0(proj_root, "/img/p_best_model_precis_level1.png"),
+       height = 4, width = 8)
+
+
+```
+
+
+## Level 2
+
+Now level 2:
+
+```{r fav-model-l2}
+
+p_best_model_precis_level2 <- best_model_precis %>% 
+  mutate_if(is.numeric, round, digits = 2) %>% 
+  dplyr::filter(str_detect(Coefficient, "beta0")) %>%  
+  ggplot(aes(y = coeff_label)) +
+  geom_errorbarh(aes(xmin = `lower 0.89`, xmax = `upper 0.89`), height = .1) +
+  geom_point(aes(x = Mean), color = "red", size = 2) +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "grey60") +
+  theme_classic() +
+  labs(x = "Value",
+       y = "Coefficient",
+       caption = "Note. Error bars indicate 89% percentile intervals. Red dots refer to the mean.") 
+
+p_best_model_precis_level2
+
+
+ggsave(plot = p_best_model_precis_level2,
+       filename = paste0(proj_root, "/img/p_best_model_precis_level2.png"),
+       height = 4, width = 8)
+
+```
 
 
 
@@ -1046,6 +1165,7 @@ model_error[[best_model_name]] %>%
   as_tibble() %>% 
   rename(error = value) %>% 
   mutate(pred = best_model_preds$value) -> best_model_pred_err
+
 p_best_model_pred_err <- best_model_pred_err %>% 
   ggplot() +
   aes(x = pred, y = error) +
@@ -1122,11 +1242,16 @@ save(best_model_preds,
      file = paste0(proj_root, "/objects/best_model_preds.Rda"))
 
 save(model_predictions,
-     file = paste0(proj_root, "/objectsmodel_predictions.Rda"))
+     file = paste0(proj_root, "/objects/model_predictions.Rda"))
 
 
 save(model_avg_predictions,
-     file = paste0(proj_root, "/model_avg_predictions.Rda"))
+     file = paste0(proj_root, "objects/model_avg_predictions.Rda"))
+
+
+save(best_model_precis,
+     file = paste0(proj_root, "/objects/best_model_prcis.Rda"))
+
 
 
 ```

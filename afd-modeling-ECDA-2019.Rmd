@@ -74,17 +74,18 @@ Right-wing populism then and now
 
 
 class: top, left
-# Causes of 20th century world wars
+# A model of *rough populism*
 
 
-- Perceived in-group superiority (nationals, racism, antizionism)
+```{r out.width="80%"}
+my_file <- paste0(proj_root, "/img/rough-populism2-crop.png")
+stopifnot(file.exists((my_file)))
+knitr::include_graphics("img/rough-populism2-crop.png")
+```
 
-- (Perceived) injustice and inequality
-
-- Autocrats as political leaders
 
 
-.small[.footnote[Source: Kershaw, I. (2016). To hell and back: Europe 1914-1949. New York City, NW: Penguin.]]
+.small[.footnote[Cf. Kershaw, I. (2016). To hell and back: Europe 1914-1949. New York City, NW: Penguin. Welzer, H. (2007). Täter. Wie aus ganz normalen Menschen Massenmörder werden. Frankfurt: Fischer.]]
 
 
 
@@ -93,23 +94,6 @@ class: top, left
 Image credit:Wikipedia, RIA Novosti archive, image #44732 / Zelma / CC-BY-SA 3.0
 
 
-
----
-
-
-class: top, left
-
-# Right-wing populism varies greatly, but...
-
-
-
-```{r out.width="80%"}
-my_file <- paste0(proj_root, "/img/audience-828584_1280.jpg")
-if (!file.exists(my_file)) warning ("File does not exist")
-knitr::include_graphics( "img/audience-828584_1280.jpg")
-```
-
-.footnote[Source: https://pixabay.com/photos/audience-crowd-people-persons-828584/ Pixabay Licence]
 
 
 ???
@@ -129,8 +113,6 @@ knitr::include_graphics( "img/audience-828584_1280.jpg")
 - sees threat in *cultural outsiders*
 
 
-.footnote[Source: Decker, F. (2003). Der neue Rechtspopulismus. Wiesbaden: VS Verlag für Sozialwissenschaften. Nicole Berbuir, Marcel Lewandowsky & Jasmin Siri (2015) The AfD and its Sympathisers: Finally a Right-Wing Populist Movement in Germany?, German Politics, 24:2,
-154-178, DOI: 10.1080/09644008.2014.982546]
 
 
 
@@ -145,6 +127,10 @@ knitr::include_graphics( "img/audience-828584_1280.jpg")
 ```{r out.width="80%"}
 knitr::include_graphics("https://upload.wikimedia.org/wikipedia/commons/thumb/b/b8/Alternative-fuer-Deutschland-Logo-2013.svg/2880px-Alternative-fuer-Deutschland-Logo-2013.svg.png")
 ```
+
+
+.footnote[Source: Decker, F. (2003). Der neue Rechtspopulismus. Wiesbaden: VS Verlag für Sozialwissenschaften. Nicole Berbuir, Marcel Lewandowsky & Jasmin Siri (2015) The AfD and its Sympathisers: Finally a Right-Wing Populist Movement in Germany?, German Politics, 24:2,
+154-178, DOI: 10.1080/09644008.2014.982546]
 
 
 ???
@@ -170,13 +156,15 @@ The AfD ...
 class: top, left
 # Popular theories on AfD success
 
-Populist party support is fueled by ...
 
-- weak economy ("rust belt hypothesis") `r icon::fa("industry")`
 
-- high immigration ("flooding hypothesis") `r icon::fa("walking")`
+- `r icon::fa("industry", size = 3)` weak economy ("rust belt hypothesis") 
 
-- cultural patterns ("Saxonia hypothesis") `r icon::fa("flag")`
+
+- `r icon::fa("walking", size = 3)` high immigration ("flooding hypothesis") 
+
+
+- `r icon::fa("flag", size = 3)` cultural patterns ("Saxonia hypothesis") 
 
 
 
@@ -184,6 +172,35 @@ Populist party support is fueled by ...
 
 
 ---
+
+
+
+# Behavior types model *CHOUGHS*
+
+
+- Seven behavior types according to CHOUGHS model
+
+  - C onformism
+  - H edonism 
+  - O ut of responsibility 
+  - U nderstand 
+  - G ourmets 
+  - H armony 
+  - S elf-determined 
+  
+- based on approx. 100k face-to-face interviews (stratified by sex and age)
+- Multidimensional scaling was used to devise types
+- CHOUGHS builts on Schwartz' values model
+
+.footnote[Source:
+Gansser, O., & Lübke, K. (2018). *The development of new typologies of behaviour based on universal human values and purchasing behavior*, in: Archives of Data Science, Series B, in submission.
+Gebauer, H., Haldimann, M., & Saul, C.J. (2017). Service innovations breaking
+institutionalized rules of health care. *Journal of Service Management*, 28(5), 972-935.]
+
+
+---
+
+
 
 # Our research model
 
@@ -200,11 +217,11 @@ grViz(
   
   node [fontname = Helvetica, fontcolor = darkslategray,
   shape = rectangle, fixedsize = true, width = 3,
-  color = darkslategray]; unemployment; foreigners; east_west; personality; AfD
+  color = darkslategray]; unemployment; foreigners; east_west; personality_types; AfD
 
 
   unemployment -> AfD
-  personality -> AfD
+  personality_types -> AfD
   foreigners -> AfD
   east_west -> AfD}"
 
@@ -295,13 +312,11 @@ class: top, left
 
 - Election related data were obtained from [Bundeswahlleiter 2017](https://www.bundeswahlleiter.de/bundestagswahlen/2017/ergebnisse.html)
 
-- Personality data (n = 12444) were collected by the authors
-
-- Some ZIP codes could not be matched to electoral districts
+- Behavior types data (n = 12444) were collected by the authors ´
 
 - Data and analysis are accessible at Github: https://github.com/sebastiansauer/afd_values
 
-- Outcome variable: `afd_votes` (proportion) was log-transformed for better approximation to normality
+- Outcome variable: proportion of votes for AfD was log-transformed for better approximation to normality
 
 
 ```{r echo = FALSE, out.width = "60%"}
@@ -312,30 +327,6 @@ knitr::include_graphics("img/p_afd_prop_skewness.png")
 
 
 
-# Personality model CHOUGHS
-
-
-- Seven personality types according to CHOUGHS model
-
-  - C onformism
-  - H endonism 
-  - O ut of responsibility 
-  - U nderstand 
-  - G ourmets 
-  - H armony 
-  - S elf-determined 
-  
-- Sample: approx. 100k face-to-face interviews (stratified by sex and age)
-- Multi dimensional scaling was used to devise types
-- CHOUGHS builts on Schwartz' values model
-
-.footnote[Source:
-Gansser, O., & Lübke, K. (2018). *The development of new typologies of behaviour based on universal human values and purchasing behavior*, in: Archives of Data Science, Series B, in submission.
-Gebauer, H., Haldimann, M., & Saul, C.J. (2017). Service innovations breaking
-institutionalized rules of health care. *Journal of Service Management*, 28(5), 972-935.]
-
-
----
 
 # Bayes modeling
 
@@ -344,7 +335,7 @@ institutionalized rules of health care. *Journal of Service Management*, 28(5), 
 
 - Hamiltonian Markov Chain Monte Carlo (MCMC)
 
-- 2000 iterations,  2 chains, 1/2 burn-in
+- 2000 iterations,  2 chains, 1/2 warmup
 
 - Multi level regression modeling (varying intercepts)
 
@@ -357,50 +348,61 @@ institutionalized rules of health care. *Journal of Service Management*, 28(5), 
 
 
 
-.footnote[Guideline: McElreath, R. (2016). Statistical rethinking. New York City, NY: Apple Academic Press Inc.]
+.footnote[Cf. McElreath, R. (2016). Statistical rethinking. New York City, NY: Apple Academic Press Inc.]
 
 ---
+
 
 # Model specification
 
 
-<!-- $$\begin{aligned} -->
-<!-- \text{AfD}_i \sim \mathcal{N}(\mu_i, \sigma)\\ -->
-<!-- \mu_i = \beta 0_{[east]} + \beta 1 \cdot \text{foreign_z} + \beta2  -->
-<!-- \cdot \text{unemp_z} +\\ -->
-<!-- \beta3 \cdot \text{enjoyer} + beta4 \cdot \text{harmony_seeker} +\\ -->
-<!-- \beta5 \cdot \text{self_determined} + beta6 \cdot \text{appreciater} +\\ -->
-<!-- \beta7 \cdot \text{conformist} + beta8 \cdot \text{type_unknown} +\\ -->
-<!-- \beta9 \cdot \text{responsibility_denier} \\ -->
 
-<!-- \beta0_{[east]} \sim  \mathcal{N}(0, 1)\\ -->
-<!-- \beta1 \dotsc \beta9 \sim  \mathcal{N}(0, 1)\\ -->
+$a \sim \mathcal{N}(\mu,\sigma)$ 
 
-<!-- \sigma \sim \mathcal{Cauchy}(0, 1)\\ -->
-<!-- \end{aligned}$$ -->
+$\mu = \beta_0 e + \beta_1 f + \beta_2 u + \beta_3 t_1 + \beta_4 t_2 \cdots \beta_{10} t_8$ 
 
+$\sigma \sim \mathcal{Cauchy}(0, 1)$
+
+
+
+$f, u, t_1, t_2 \cdots t_8 \sim \mathcal{N}(1, 0)$ 
+
+$e \sim \mathcal{N}(0, \sigma_2)$ 
+
+
+$\sigma_2 \sim \mathcal{Cauchy}(0, 1)$
+
+---
+
+
+# Model specification in R
 
 ```{r m9-stan, eval = FALSE, echo = TRUE}
 # Likelihood:
 afd_prop_log ~ dnorm(mu, sigma),
 
+d$
+
 # regression:
 mu <- beta0[state_id] + beta1*for_prop_z     + beta2*unemp_prop_z +
   beta3*enjoyer       + beta4*harmony_seeker + beta5*self_determined +
   beta6*appreciater   + beta7*conformist     + beta8*type_unknown +
-  beta9*responsibility_denier,
+  beta9*responsibility_denier + beta10*hedonist,
 
 # priors:
 sigma  ~ dcauchy(0, 1),
 beta1  ~ dnorm(0, 1), beta2 ~ dnorm(0, 1), beta3 ~ dnorm(0, 1),   
 beta4  ~ dnorm(0, 1), beta5 ~ dnorm(0, 1), beta6 ~ dnorm(0, 1),
 beta7  ~ dnorm(0, 1), beta8 ~ dnorm(0, 1), beta9 ~ dnorm(0, 1),
+beta10 ~ dnorm(0, 1),
 beta0[state_id] ~ dnorm(0, sigma2),  # multi level
 sigma2 ~ dcauchy(0, 1)
 ```
 
 
 ---
+
+
 
 
 
@@ -417,8 +419,6 @@ class: middle, center, inverse
 
 ```{r}
 stan_model_comparison_output <- read.csv(paste0(proj_root,"/objects/model_comparison.csv"))
-
-
 ```
 
 
@@ -463,6 +463,12 @@ knitr::include_graphics(paste0(proj_root, "/img/p_r2_all_models.png"))
 
 ---
 
+
+
+
+
+
+
 class: middle, center, inverse
 
 # Results: Most favorable model
@@ -493,34 +499,31 @@ beta2  ~ dnorm(0, 1)
 
 ---
 
-# Coefficients of the most favorable model
+# Coefficients level 1
 
 Model predictors: state (as multi level) + foreign + unemp
 
 
-```{r fav-model, echo=FALSE, dpi = 300, out.width="80%"}
+```{r fav-model-l1, echo=FALSE, dpi = 300, out.width="100%"}
+knitr::include_graphics("img/p_best_model_precis_level1.png")
 
-best_model_precis <- read_csv(paste0(proj_root, "/objects/best_model_precis.csv"))
-
-best_model_precis %>% 
-  rename(Coefficient = X1) %>% 
-  mutate_if(is.numeric, round, digits = 2) %>% 
-  filter(Coefficient %in% c("sigma", "beta1", "beta2")) %>%  
-  ggplot(aes(y = Coefficient)) +
-  geom_errorbarh(aes(xmin = `lower 0.89`, xmax = `upper 0.89`), height = .1) +
-  geom_point(aes(x = Mean), color = "red", size = 2) +
-  geom_vline(xintercept = 0, linetype = "dashed", color = "grey60") +
-  theme_classic() +
-  labs(x = "Value",
-       caption = "Note. Error bars indicate 89% mass intervals. Red dots refer to the mean.") +
-  annotate("label", x = c(1.5, .5, 1), y = c("beta2", "beta1", "sigma"), 
-           label = c("unemployment rate", "foreigner rate", "residual sd"),
-           hjust = 1,
-           color = "grey60")
 ```
 
 
-.footnote[Only level 1 coefficients are shown.]
+---
+
+
+# Coefficients level 2
+
+Model predictors: state (as multi level) + foreign + unemp
+
+
+```{r fav-model-l2, echo=FALSE, dpi = 300, out.width="100%"}
+knitr::include_graphics("img/p_best_model_precis_level2.png")
+
+```
+
+
 
 ---
 
@@ -532,33 +535,6 @@ Model predictors: state (as multi level) + foreign + unemp
 ```{r m15trace, out.width = "50%"}
 knitr::include_graphics("img/traceplot_best_model.png")
 ```
-
----
-
-
-# Model additivity assumption of best model
-
-Model predictors: state (as multi level) + foreign + unemp
-
-
-```{r out.width="80%"}
-knitr::include_graphics("img/p_best_model_pred_err.png")
-```
-
-
-.footnote[Gelman, A., & Hill, J. (2006). Data analysis using regression and multilevel/hierarchical models. Cambridge university press.]
-
----
-
-# Posterior distributions  of best model
-
-Model predictors: state (as multi level) + foreign + unemp
-
-
-```{r out.width = "100%"}
-knitr::include_graphics("img/p-post-best-model.png") 
-```
-
 
 ---
 
@@ -578,7 +554,7 @@ knitr::include_graphics("img/modelest-vs-obs.png")
 ---
 
 
-# Regional patterns of prediction errors (as to best model)
+# Regional patterns of prediction errors 
 
 
 
