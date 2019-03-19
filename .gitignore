@@ -13,7 +13,7 @@ input/
 # project files
 .Rproj.user/
 .Rhistory
-
+.Rproj.user
 
 
 # other strange stuff
@@ -21,4 +21,8 @@ input/
 
 
 
-.Rproj.user
+.RData
+
+
+
+

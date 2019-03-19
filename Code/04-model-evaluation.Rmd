@@ -110,7 +110,7 @@ model_description <- read_csv2(paste0(proj_root, "/objects/model-description.csv
 
 
 ```{r}
-best_model_precis <- precis(models[[best_model_name]], depth = 2)@output %>% 
+best_model_precis_raw <- precis(models[[best_model_name]], depth = 2)@output %>% 
   rownames_to_column(var = "Coefficient")
 ```
 
@@ -118,16 +118,11 @@ best_model_precis <- precis(models[[best_model_name]], depth = 2)@output %>%
 
 ## Define labels
 
-```{r}
-coeff_labels <- tibble(
-  Coefficient = best_model_precis$Coefficient,
-  coeff_label = c(levels(d79$state), "level1_resid", "level2_resid", "foreigner rate", "unemployment rate"))
-)
-
-coeff_labels
-
-best_model_precis <- best_model_precis %>% 
-  full_join(coeff_labels)
+```{r best-model-precis}
+best_model_precis <- best_model_precis_raw %>% 
+  mutate(state_id = parse_number(str_extract(Coefficient, "\\[\\d+\\]"))) %>% 
+  full_join(state_dict) %>% 
+  mutate(coeff_label = state)
 
 best_model_precis
 ```
@@ -226,6 +221,16 @@ model_comparison <- compare_reduced_sample@output %>%
 model_comparison %>% kable()
 
 
+```
+
+
+### Vector of count models
+
+
+```{r}
+vector_count_model_names <- model_comparison %>% 
+  filter(`outcome distribution` == "Poisson") %>% 
+  pull(model)
 ```
 
 
@@ -405,15 +410,44 @@ names(model_error) <- names(models79)
 ```
 
 
-## Plot the distribution of absolute MEAN errors per model
-
-```{r plot-err-distrib}
+```{r}
 model_error_long <- model_error %>% 
   as_tibble() %>% 
   gather(key = model, value = abs_error) %>% 
   mutate(is_best_model = ifelse(model == best_model_name, 
                                 TRUE, 
-                                FALSE)) 
+                                FALSE))
+```
+
+
+### Count 
+
+Now with the count models:
+
+```{r comp-all-model-errors-incl-count, results = "hide"}
+model_error_incl_count <- purrr::map(models79_incl_count, comp_abs_error, data = d79)
+
+names(model_error) <- names(models79)
+```
+
+
+```{r}
+model_error_long_incl_count <- model_error_incl_count %>% 
+  as_tibble() %>% 
+  gather(key = model, value = abs_error) %>% 
+  mutate(is_best_model = ifelse(model == best_model_name, 
+                                TRUE, 
+                                FALSE))
+
+
+```
+
+
+
+## Plot the distribution of absolute MEAN errors per model
+
+```{r plot-err-distrib}
+ 
 
 p_mod_err_density <- model_error_long %>% 
   ggplot(aes(x = abs_error)) +
@@ -442,6 +476,38 @@ p_mod_err_boxplots
 ggsave(filename = paste0(proj_root, "/img/p_mod_err_boxplots.png"),
        width = 8, height = 4)
   
+```
+
+
+### Count
+
+Count only, beacsue in count the error is on the raw number of obervations.
+
+Get best Count model:
+
+```{r}
+model_error_long_incl_count <-  model_error_long_incl_count %>% 
+  dplyr::filter(model %in% vector_count_model_names) %>% 
+  mutate(is_best_model = abs_error == min(.$abs_error))
+
+```
+
+
+```{r}
+p_mod_err_boxplots_incl_count <- model_error_long_incl_count %>% 
+  ggplot(aes(x = model, y= abs_error)) +
+  theme_classic() +
+  geom_boxplot()  +
+  labs(title = "Distribution of absolute prediction error per model",
+       caption = "Note. Target variable is count of AfD votes",
+       y = "Absolute error")
+p_mod_err_boxplots_incl_count
+
+ggsave(plot = p_mod_err_boxplots_incl_count,
+       filename = paste0(proj_root, "/img/p_mod_err_boxplots_incl_count.png"),
+       width = 8, height = 4)
+  
+
 ```
 
 
@@ -874,12 +940,12 @@ ggsave(plot = p_d_short_w_pred_err,
 p_best_model_precis_level1 <- best_model_precis %>% 
   mutate_if(is.numeric, round, digits = 2) %>% 
   dplyr::filter(Coefficient %in% c("sigma", "beta1", "beta2")) %>%  
-  ggplot(aes(y = coeff_label)) +
+  ggplot(aes(y = Coefficient)) +
   geom_errorbarh(aes(xmin = `lower 0.89`, xmax = `upper 0.89`), height = .1) +
   geom_point(aes(x = Mean), color = "red", size = 2) +
   geom_vline(xintercept = 0, linetype = "dashed", color = "grey60") +
   theme_classic() +
-  labs(x = "Value",
+  labs(x = "beta weight",
        y = "Coefficient",
        caption = "Note. Error bars indicate 89% percentile intervals. Red dots refer to the mean.") 
 
@@ -898,6 +964,16 @@ ggsave(plot = p_best_model_precis_level1,
 
 Now level 2:
 
+Average slope between states:
+
+```{r}
+mean_slope_between_states <- best_model_precis %>% 
+  dplyr::filter(str_detect(Coefficient, "beta0")) %>% 
+  summarise(beta_states_mean = mean(Mean, na.rm = TRUE)) %>% 
+  pull(beta_states_mean)
+```
+
+
 ```{r fav-model-l2}
 
 p_best_model_precis_level2 <- best_model_precis %>% 
@@ -906,11 +982,11 @@ p_best_model_precis_level2 <- best_model_precis %>%
   ggplot(aes(y = coeff_label)) +
   geom_errorbarh(aes(xmin = `lower 0.89`, xmax = `upper 0.89`), height = .1) +
   geom_point(aes(x = Mean), color = "red", size = 2) +
-  geom_vline(xintercept = 0, linetype = "dashed", color = "grey60") +
+  geom_vline(aes(xintercept = mean_slope_between_states), linetype = "dashed", color = "grey60") +
   theme_classic() +
-  labs(x = "Value",
-       y = "Coefficient",
-       caption = "Note. Error bars indicate 89% percentile intervals. Red dots refer to the mean.") 
+  labs(x = "beta weight (log of AfD votes)",
+       y = "State coefficient",
+       caption = "Note. Error bars indicate 89% percentile intervals. Red dots refer to the mean. The dashed line shows the mean of the state slopes.") 
 
 p_best_model_precis_level2
 
@@ -922,6 +998,36 @@ ggsave(plot = p_best_model_precis_level2,
 ```
 
 
+Now the de-logged values:
+
+
+
+
+```{r fav-model-l2}
+
+p_best_model_precis_level2_delogged <- best_model_precis %>% 
+  mutate_if(is.numeric, round, digits = 2) %>% 
+  dplyr::filter(str_detect(Coefficient, "beta0")) %>%  
+  mutate(mean_delogged = exp(Mean),
+         low89 = exp(`lower 0.89`),
+         up89 = exp(`upper 0.89`)) %>% 
+  ggplot(aes(y = coeff_label)) +
+  geom_errorbarh(aes(xmin = low89, xmax = up89), height = .1) +
+  geom_point(aes(x = mean_delogged), color = "red", size = 2) +
+  geom_vline(aes(xintercept = mean(mean_delogged)), linetype = "dashed", color = "grey60") +
+  theme_classic() +
+  labs(x = "beta weight (AfD votes proportion)",
+       y = "State coefficient",
+       caption = "Note. Error bars indicate 89% percentile intervals. Red dots refer to the mean. The dashed line shows the mean of the state slopes.") 
+
+p_best_model_precis_level2_delogged
+
+
+ggsave(plot = p_best_model_precis_level2_dleogged,
+       filename = paste0(proj_root, "/img/p_best_model_precis_level2_delogged.png"),
+       height = 4, width = 8)
+
+```
 
 
 

@@ -1,0 +1,93 @@
+---
+title: "05_geoplotting"
+author: "Ich"
+date: "3/19/2019"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+
+
+```{r}
+proj_root <- rprojroot::find_root(as.root_criterion(is_rstudio_project))
+```
+
+
+
+```{r}
+
+library(tidyverse)
+library(sf)
+library(reprex)
+```
+
+
+Load data:
+
+# Data
+
+## Shapefile
+
+```{r}
+path <- "/Users/sebastiansaueruser/Documents/datasets/geo_maps/vg250/"
+shape_file <- "VG250_L.shp"
+de <- st_read(paste0(path,shape_file))
+```
+
+
+## Value data
+
+
+
+```{r load-values-data}
+load(paste0(proj_root, "/data_raw/Choughs2017.Rdata"))
+values <- Choughs2017
+
+values_head <- head(values) %>% 
+  select(lon, lat)
+
+(values_head)
+```
+
+
+
+
+
+# Plot
+
+
+## Ländergrenzen
+plot the Ländegrenzen:
+
+```{r}
+de %>% 
+  dplyr::filter(AGZ %in% c(1,2)) %>% 
+  ggplot() +
+  geom_sf()
+```
+
+
+## Now with values
+
+```{r}
+values_sf <- st_as_sf(values, coords = c("lon", "lat"),
+                      crs = 4326)
+```
+
+
+```{r}
+
+de %>% 
+  dplyr::filter(AGZ %in% c(1,2)) %>% 
+  ggplot() +
+  geom_sf() +
+  geom_sf(data = values_sf)
+
+
+```
+
+
+
+
+

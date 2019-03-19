@@ -194,7 +194,7 @@ wahlkreise_shp %>%
 
 
 
-### Distriub of PLZ
+### Distrib of PLZ
 
 ```{r}
 values %>% 
@@ -211,6 +211,17 @@ values %>%
   select(fit.cluster, PLZ ) %>% 
   drop_na(PLZ) %>% 
   nrow()
+```
+
+
+For how many ZIPs do we have value data?
+
+
+```{r}
+values %>% 
+  distinct(PLZ) %>% 
+  nrow()
+  
 ```
 
 
@@ -240,7 +251,58 @@ zip %>%
 
 ```{r}
 zip %>% 
-  filter(PLZ == "80639")
+  filter(str_detect(PLZ,"80336")) 
+
+
+zip %>% 
+  filter(str_detect(PLZ,"80636")) 
+
+values %>% 
+  filter(str_detect(PLZ,"80636")) 
+```
+
+In contrast, how many value data points (CHOUHGS) do we have alone for this PLZ?
+
+```{r}
+values %>% 
+  filter(str_detect(PLZ,"8063")) %>% 
+  nrow()
+
+zip%>% 
+  filter(str_detect(PLZ,"8063")) %>% 
+  nrow()
+```
+
+
+
+Hamburg
+
+```{r}
+zip %>% 
+  filter(str_detect(PLZ,"220")) %>% 
+  nrow()
+```
+
+
+# How many ZIP can be joined to value?
+
+
+```{r}
+values %>% 
+  left_join(zip) %>% 
+  drop_na(PLZ) %>% 
+  nrow()
+```
+
+
+
+And vice versA:
+
+```{r}
+zip %>% 
+  left_join(values) %>% 
+  drop_na(PLZ) %>% 
+  nrow()
 ```
 
 
@@ -369,6 +431,16 @@ Add state id:
 
 ```{r staste-id}
 d_short_nona$state_id <- coerce_index(d_short_nona$state)
+
+```
+
+
+Create dictionnary for state id:
+
+```{r state-dict} 
+state_dict <- d_short_nona %>% 
+  distinct(state_id, .keep_all = TRUE) %>% 
+  select(state_id, state)
 ```
 
 
@@ -439,13 +511,6 @@ d_zip %>%
 ```
 
 
-Check for Nordrfiesland
-
-
-```{r}
-
-```
-
 
 
 ## Join election data with values data
@@ -479,10 +544,12 @@ Note the type of join
 d_joined %>% 
   drop_na(fit.cluster, PLZ) %>% 
   nrow()
+
+# 14k
 ```
 
 
-How many different areas?
+How many different areas in total?
 
 ```{r}
 d_joined %>% 
@@ -491,6 +558,52 @@ d_joined %>%
 
 
 thats'ok, 299 different areas. Go ahead.
+
+
+How many areas for which we have values?
+
+
+```{r}
+d_joined2 <- d_joined %>% 
+  drop_na(fit.cluster) %>% 
+  group_by(area_nr) %>% 
+  glimpse()
+
+d_joined2 <- d_joined2 %>% ungroup()
+```
+
+
+There are values data for 271 districts!
+
+
+## Check for Nürnberg, Stuttgart
+
+```{r}
+d_joined %>% 
+  drop_na(fit.cluster) %>% 
+  filter(str_detect(area_name, "Stutt"))
+```
+
+
+ONly 6 rows for Stuttgart, strange.
+
+```{r}
+d_joined %>% 
+  drop_na(fit.cluster) %>% 
+  filter(str_detect(area_name, "Nürnb"))
+```
+
+
+
+```{r}
+d_joined %>% 
+  drop_na(fit.cluster) %>% 
+  filter(str_detect(area_name, "Stutt|Nürnb"))
+```
+
+
+
+No data for Nürnberg! Can that be?
 
 
 
@@ -551,6 +664,31 @@ werte %>%
 ```
 
 
+Let's check for how many areas we have complete data
+```{r}
+werte %>% 
+  drop_na()
+```
+
+
+Let's visualize that in a heatmap:
+
+
+```{r}
+p_heatmap_areas <- werte %>% 
+  select(-"<NA>") %>% 
+  gather(key = typ, value = n_pro_wahlkreis, -area_nr) %>% 
+  ggplot(aes(x = typ, y = area_nr)) +
+  geom_tile(aes(fill = n_pro_wahlkreis)) +
+  scale_y_continuous(limits = c(0, 299))
+
+p_heatmap_areas
+
+ggsave(filename = paste0(proj_root, "/img/p_heatmap_areas.png"),
+       width = 8, height = 4)
+```
+
+
 
 Now we join that to the n=299 data frame:
 
@@ -595,9 +733,10 @@ d_joined_values %>%
   summarise(sum(n_wertetypen, na.rm = TRUE))
 ```
 
+In sum, approx. 12k.
 
 
-
+But we have a lot of rows with *some* missing values. If we drop all such rows, only 79 remain:
 ```{r}
 d_joined_values %>% 
   drop_na(Genieser:Verantwortungsverweiterer) %>% nrow()
@@ -605,7 +744,57 @@ d_joined_values %>%
 
 
 
-Only 81, out of 299. That's a lot of data lost :-(.
+Only 79, out of 299. That's a lot of data lost :-(.
+
+To put it differently:
+
+```{r}
+d_joined_values %>% 
+  mutate(sum_isna = rowSums(is.na(select(d_joined_values, 
+                                         Genieser:Verantwortungsverweiterer)))) %>% 
+  filter(sum_isna == 0) %>% 
+  nrow()
+```
+
+
+
+How many rows are *completely* empty?
+
+```{r}
+d_joined_values %>% 
+  dplyr::filter(n_wertetypen == 0 | is.na(n_wertetypen)) %>% 
+  nrow()
+```
+
+
+That's at least 180! Not so bad.
+
+
+Let's check for the big cities:
+
+```{r}
+dummy <- d_joined_values %>% 
+  select(area_name, n_wertetypen)
+```
+
+No data for Stuttgart and Nürnberg, strange.
+
+
+
+# Check for missing PLZs
+
+
+
+```{r}
+filter(zip, str_detect(PLZ, "2203")) %>% nrow()
+filter(values, str_detect(PLZ, "2203")) %>% nrow()
+
+
+filter(zip, str_detect(PLZ, "8803")) %>% nrow()
+filter(values, str_detect(PLZ, "8803")) %>% nrow()
+
+```
+
 
 
 
@@ -671,5 +860,13 @@ The short file:
 ```{r}
 write_csv(d_joined_values,
           path = "objects/d_joined_values.csv")
+```
+
+
+State id dictionnary:
+
+```{r}
+save(state_dict,
+     file = paste0(proj_root, "/objects/state_dict.Rda"))
 ```
 
